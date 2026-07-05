@@ -3,7 +3,7 @@ import { parse as parseCookies, serialize as serializeCookie } from "cookie";
 import { db, matchRoute, toErrorResponse } from "@quitado/core";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const pathSegments = req.query.path;
+  const pathSegments = req.query.slug;
   const path = "/" + (Array.isArray(pathSegments) ? pathSegments.join("/") : (pathSegments ?? ""));
 
   const match = matchRoute(req.method as any, path);
@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cookies = parseCookies(req.headers.cookie ?? "");
   const query: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(req.query)) {
-    if (key === "path") continue;
+    if (key === "slug") continue;
     query[key] = Array.isArray(value) ? value[0] : value;
   }
 
