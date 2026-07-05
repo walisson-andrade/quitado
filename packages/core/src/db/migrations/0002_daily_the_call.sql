@@ -1,0 +1,1 @@
+ALTER TABLE "quitado_faturas_importadas" ADD COLUMN "origem" text;

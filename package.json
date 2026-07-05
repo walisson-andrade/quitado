@@ -1,0 +1,22 @@
+{
+  "name": "quitado",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @quitado/web dev",
+    "dev:api": "pnpm --filter @quitado/api-dev dev",
+    "build": "pnpm -r --filter=./packages/* --filter=./apps/web build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @quitado/core db:generate",
+    "db:migrate": "pnpm --filter @quitado/core db:migrate",
+    "db:seed": "pnpm --filter @quitado/core db:seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
