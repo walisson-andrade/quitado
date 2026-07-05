@@ -1,6 +1,5 @@
 {
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @quitado/shared-types --filter @quitado/calc --filter @quitado/core build",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @quitado/shared-types --filter @quitado/calc --filter @quitado/core build",
   "functions": {
     "api/**/*.ts": { "maxDuration": 60 }
   },
