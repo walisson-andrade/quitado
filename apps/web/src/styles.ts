@@ -193,6 +193,12 @@ export const fontImports = `
   }
   .q-theme-btn:hover { color: var(--q-text); }
   .q-theme-btn:active { transform: scale(0.92); }
+
+  /* Login: anel de foco teal no grupo do campo de senha (mata a borda branca do navegador). */
+  .q-login-input:focus-within {
+    border-color: var(--q-teal) !important;
+    box-shadow: 0 0 0 3px var(--q-success-tint);
+  }
 `;
 
 export const styles: Record<string, CSSProperties> = {
@@ -393,7 +399,109 @@ export const styles: Record<string, CSSProperties> = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: 18,
     padding: 24,
+    position: "relative",
+    overflow: "hidden",
+  },
+  loginGlowTop: {
+    position: "absolute",
+    top: -120,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: 420,
+    height: 300,
+    background: "radial-gradient(ellipse at center, var(--q-success-tint), transparent 65%)",
+    pointerEvents: "none",
+  },
+  loginGlowBottom: {
+    position: "absolute",
+    bottom: -140,
+    right: -80,
+    width: 380,
+    height: 300,
+    background: "radial-gradient(ellipse at center, var(--q-glow-2), transparent 65%)",
+    pointerEvents: "none",
+  },
+  loginCard: {
+    position: "relative",
+    width: "100%",
+    maxWidth: 340,
+    background: "var(--q-card-bg)",
+    border: "1px solid var(--q-border)",
+    borderRadius: 20,
+    padding: "28px 24px 24px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  loginLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 13,
+    background: "linear-gradient(135deg, var(--q-teal), var(--q-blue))",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "'Space Grotesk', sans-serif",
+    fontWeight: 700,
+    color: "var(--q-on-accent)",
+    fontSize: 22,
+    boxShadow: "0 8px 20px -8px var(--q-success-tint)",
+    marginBottom: 14,
+  },
+  loginBrandName: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 21, lineHeight: 1.1 },
+  loginBrandSub: { fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", margin: "4px 0 24px" },
+  loginFieldWrap: { width: "100%", display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 },
+  loginInputGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "var(--q-inset-bg)",
+    border: "1px solid var(--q-border-input)",
+    borderRadius: 12,
+    padding: "11px 12px",
+  },
+  loginInput: {
+    flex: 1,
+    minWidth: 0,
+    background: "none",
+    border: "none",
+    outline: "none",
+    color: "var(--q-text)",
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: "var(--fs-body)",
+    letterSpacing: 3,
+  },
+  loginEyeBtn: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    display: "flex",
+    color: "var(--q-text-faint)",
+    cursor: "pointer",
+  },
+  loginButton: {
+    width: "100%",
+    background: "linear-gradient(135deg, var(--q-teal), var(--q-blue))",
+    border: "none",
+    borderRadius: 12,
+    padding: "12px 16px",
+    color: "var(--q-on-accent)",
+    fontFamily: "'Space Grotesk', sans-serif",
+    fontWeight: 600,
+    fontSize: "var(--fs-body)",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  loginFoot: {
+    fontSize: "var(--fs-tiny)",
+    color: "var(--q-text-faint)",
+    marginTop: 16,
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
   },
 };
