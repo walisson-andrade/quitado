@@ -344,7 +344,7 @@ export const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     textDecoration: "underline",
   },
-  addPersonRow: { display: "flex", gap: 8, alignItems: "center", marginTop: 4 },
+  addPersonRow: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 4 },
 
   // --- Painel: card "Este mês" ---
   esteMesRow: {
@@ -446,8 +446,8 @@ export const styles: Record<string, CSSProperties> = {
   navLabel: { fontSize: "var(--fs-tiny)" },
 
   // --- Formulários / listas de CRUD e login (extensão do design system do protótipo) ---
-  formRow: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" },
-  fieldWrap: { display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 0 },
+  formRow: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "flex-end" },
+  fieldWrap: { display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 120 },
   fieldLabel: { fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", fontFamily: "'Inter', sans-serif" },
   input: {
     flex: 1,

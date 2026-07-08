@@ -52,11 +52,11 @@ export function MesInput({
   }
 
   return (
-    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
       <select
         value={mes ?? ""}
         onChange={(e) => atualizar(ano ?? new Date().getFullYear(), Number(e.target.value))}
-        style={{ ...styles.inputMono, fontFamily: "'Inter', sans-serif", flex: 2 }}
+        style={{ ...styles.inputMono, fontFamily: "'Inter', sans-serif", flex: 2, minWidth: 110 }}
       >
         {mes === null && (
           <option value="" disabled style={optionStyle}>
@@ -72,7 +72,7 @@ export function MesInput({
       <select
         value={ano ?? ""}
         onChange={(e) => atualizar(Number(e.target.value), mes ?? new Date().getMonth() + 1)}
-        style={{ ...styles.inputMono, flex: 1 }}
+        style={{ ...styles.inputMono, flex: 1, minWidth: 80 }}
       >
         {ano === null && (
           <option value="" disabled style={optionStyle}>
