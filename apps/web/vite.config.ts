@@ -37,6 +37,10 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Bind mount do Docker Desktop no Windows não propaga eventos nativos de
+    // filesystem pro container — sem polling, o Vite nunca detecta edições
+    // feitas no host e fica servindo o bundle antigo silenciosamente.
+    watch: { usePolling: process.env.VITE_USE_POLLING === "true" },
     proxy: {
       "/api": {
         target: process.env.API_PROXY_TARGET ?? "http://localhost:3011",

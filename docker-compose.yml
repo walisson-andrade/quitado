@@ -11,6 +11,7 @@ services:
       LOCAL_STORAGE_DIR: /data/blob-storage
       WEB_ORIGIN: http://localhost:5173
       PORT: 3011
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "3011:3011"
     volumes:
@@ -26,6 +27,7 @@ services:
       dockerfile: apps/web/Dockerfile
     environment:
       API_PROXY_TARGET: http://api-dev:3011
+      VITE_USE_POLLING: "true"
     ports:
       - "5173:5173"
     volumes:
