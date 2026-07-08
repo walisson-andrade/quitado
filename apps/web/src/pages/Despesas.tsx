@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Coins, Pencil, Trash2 } from "lucide-react";
 import { CATEGORIA_LABEL, categorizarAutomaticamente, parcelamentoContaNoMes, resolverMesAtual } from "@quitado/calc";
-import { configApi, despesaFixaOverridesApi, despesasFixasApi, faturasApi, parcelamentosApi } from "../api/resources.js";
-import type { DespesaFixaOverrideRow, DespesaFixaRow, ParcelamentoRow } from "../api/types.js";
+import { cartoesApi, configApi, despesaFixaOverridesApi, despesasFixasApi, faturasApi, parcelamentosApi } from "../api/resources.js";
+import type { CartaoRow, DespesaFixaOverrideRow, DespesaFixaRow, ParcelamentoRow } from "../api/types.js";
 import { CategoriaSelect } from "../components/CategoriaSelect.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
@@ -579,6 +579,12 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
   const [categoria, setCategoria] = useState<string | null>(null);
   const [continuaIndefinidamente, setContinuaIndefinidamente] = useState(false);
   const [diaVencimento, setDiaVencimento] = useState("");
+  const [cartoes, setCartoes] = useState<CartaoRow[]>([]);
+  const [origemSelecionada, setOrigemSelecionada] = useState("manual");
+
+  useEffect(() => {
+    cartoesApi.listar().then(setCartoes);
+  }, []);
 
   async function adicionar(e: React.FormEvent) {
     e.preventDefault();
@@ -592,7 +598,7 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
       parcelaAtual: Number(parcelaAtual) || 1,
       parcelaTotal: Number(parcelaTotal) || 1,
       mesInicio,
-      origem: "manual",
+      origem: origemSelecionada,
       cartaoOrigem: null,
       categoria,
       continuaIndefinidamente,
@@ -605,6 +611,7 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
     setCategoria(null);
     setDiaVencimento("");
     setMesInicio(mesAtual);
+    setOrigemSelecionada("manual");
     onAdded();
   }
 
@@ -612,7 +619,10 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
     <section className="q-surface" style={styles.panel}>
       <div style={styles.panelHeadRow}>
         <h3 style={styles.panelTitle}>+ Novo parcelamento/empréstimo</h3>
-        <span style={styles.panelHint}>tem prazo pra acabar — some sozinho quando a última parcela é paga</span>
+        <span style={styles.panelHint}>
+          tem prazo pra acabar — some sozinho quando a última parcela é paga. Use "Cartão" pra lançar na mão o valor
+          de uma fatura que você não consegue baixar/importar.
+        </span>
       </div>
       <form onSubmit={adicionar}>
         <div style={styles.formRow}>
@@ -621,6 +631,20 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
           </Field>
           <Field label="Valor da parcela (R$)">
             <input placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} style={styles.inputMono} />
+          </Field>
+        </div>
+        <div style={styles.formRow}>
+          <Field label="Cartão (opcional — em branco entra em Custos Fixos)">
+            <select value={origemSelecionada} onChange={(e) => setOrigemSelecionada(e.target.value)} style={{ ...styles.input, width: "100%" }}>
+              <option value="manual" style={optionStyle}>
+                Custos Fixos (nenhum cartão)
+              </option>
+              {cartoes.map((c) => (
+                <option key={c.id} value={c.nome} style={optionStyle}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
         <div style={styles.formRow}>
