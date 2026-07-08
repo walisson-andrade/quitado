@@ -195,10 +195,15 @@ export function Fatura() {
     setItens(
       fatura.jsonExtraido.map((item) => ({
         ...item,
+        // Estorno/crédito conta junto (com sinal negativo, ver valorComSinal
+        // abaixo) em vez de esconder a despesa pareada: cobre também o caso
+        // real do Nubank em que o estorno vem como crédito solto, sem compra
+        // correspondente nesta mesma fatura (ex: reembolso de compra de mês
+        // anterior) — nesse caso não existiria despesa pra "cancelar" e o
+        // valor simplesmente sumiria da conta.
         incluido:
-          item.tipo === "despesa" &&
-          !ehProvavelParcelaFutura(fatura.jsonExtraido, item) &&
-          !ehCanceladoPorEstorno(fatura.jsonExtraido, item),
+          (item.tipo === "despesa" || item.tipo === "estorno") &&
+          !ehProvavelParcelaFutura(fatura.jsonExtraido, item),
       })),
     );
     setMesReferenciaFatura(fatura.mesReferenciaSugerido ?? resolverMesAtual(null));
@@ -271,8 +276,12 @@ export function Fatura() {
   }
 
   if (faturaAtual) {
-    const totalIncluido = itens.filter((i) => i.incluido).reduce((acc, i) => acc + i.valorCents, 0);
-    const totalTodos = itens.reduce((acc, i) => acc + i.valorCents, 0);
+    // Estorno/crédito reduz o total da fatura; pagamento da fatura nunca é
+    // uma cobrança nova, então não entra na soma em nenhuma hipótese.
+    const valorComSinal = (i: ItemRevisao) =>
+      i.tipo === "estorno" ? -i.valorCents : i.tipo === "despesa" ? i.valorCents : 0;
+    const totalIncluido = itens.filter((i) => i.incluido).reduce((acc, i) => acc + valorComSinal(i), 0);
+    const totalTodos = itens.reduce((acc, i) => acc + valorComSinal(i), 0);
     const totalReal = faturaAtual.totalFaturaSugeridoCents;
     // Compara contra os itens MARCADOS (o que de fato vai ser salvo) — não
     // contra a soma de tudo, que sempre vai incluir itens corretamente

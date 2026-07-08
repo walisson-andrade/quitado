@@ -160,11 +160,15 @@ export const confirmarFatura: Handler = async ({ db, body }) => {
     // ANTERIORES do mesmo cartão (nunca mexe em Custos Fixos/itens manuais).
     await tx.delete(parcelamentos).where(and(eq(parcelamentos.origem, origemFinal), isNotNull(parcelamentos.faturaImportadaId)));
 
+    // Estorno/crédito entra como parcelamento de valor NEGATIVO — reduz o
+    // total da fatura sem depender de casar nome com uma despesa específica
+    // (o Nubank manda estorno solto, sem compra correspondente nesta mesma
+    // fatura, ex: reembolso de compra de mês anterior).
     const candidatos = input.itensAprovados
-      .filter((item) => item.tipo === "despesa")
+      .filter((item) => item.tipo === "despesa" || item.tipo === "estorno")
       .map((item) => ({
         nome: item.nome,
-        valorParcelaCents: item.valorCents,
+        valorParcelaCents: item.tipo === "estorno" ? -item.valorCents : item.valorCents,
         parcelaAtual: item.parcelaAtual ?? 1,
         parcelaTotal: item.parcelaTotal ?? 1,
         mesInicio: item.mesInicio ?? item.data.slice(0, 7),
