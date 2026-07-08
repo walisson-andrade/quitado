@@ -222,13 +222,15 @@ export function Fatura() {
   }
 
   // Faturas em PDF/foto (ao contrário do CSV do Nubank) mostram a data da
-  // COMPRA original de cada parcela, não o mês em que ela está sendo cobrada
-  // — a mesma compra reaparece com essa data em todas as faturas seguintes,
-  // só a "Parcela X de Y" avança. Por isso, para itens parcelados vindos de
-  // PDF/foto, o mês de referência da fatura (informado abaixo, não a data
-  // do item) é o que define a partir de quando a parcela atual é contada.
-  const precisaMesReferencia =
-    faturaAtual?.tipoOrigem === "pdf_imagem_ia" && itens.some((i) => i.parcelaAtual != null);
+  // COMPRA original de cada item, não o mês em que ela está sendo cobrada —
+  // pra parcelados, a mesma compra reaparece com essa data em todas as
+  // faturas seguintes, só a "Parcela X de Y" avança; pra compras à vista, a
+  // data de compra pode cair no ciclo de fatura anterior (ex: comprado dia
+  // 25 numa fatura que fecha dia 30), o que faria o item "sumir" um mês
+  // antes da hora na Linha do tempo/Contas a pagar. Por isso, pra QUALQUER
+  // item vindo de PDF/foto, o mês de referência da fatura (informado abaixo,
+  // não a data do item) é o que define o mês em que ele conta.
+  const precisaMesReferencia = faturaAtual?.tipoOrigem === "pdf_imagem_ia" && itens.length > 0;
 
   async function confirmar() {
     if (!faturaAtual || confirmando) return;
@@ -239,7 +241,7 @@ export function Fatura() {
       const itensAprovados = itens
         .filter((i) => i.incluido)
         .map(({ incluido, ...resto }) => {
-          const usarMesReferencia = faturaAtual.tipoOrigem === "pdf_imagem_ia" && resto.parcelaAtual != null;
+          const usarMesReferencia = faturaAtual.tipoOrigem === "pdf_imagem_ia";
           return usarMesReferencia ? { ...resto, mesInicio: mesReferenciaFatura } : resto;
         });
       const resultado = await faturasApi.confirmar({

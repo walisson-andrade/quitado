@@ -18,7 +18,16 @@ function CategoriaMiniSelect({ nome, valor, onChange }: { nome: string; valor: s
     <select
       value={valor ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
-      style={{ ...styles.buttonGhost, padding: "6px 8px", fontFamily: "'Inter', sans-serif", fontSize: "var(--fs-xs)" }}
+      style={{
+        ...styles.buttonGhost,
+        padding: "6px 8px",
+        fontFamily: "'Inter', sans-serif",
+        fontSize: "var(--fs-xs)",
+        width: 168,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}
       title="Categoria"
     >
       <option value="" style={optionStyle}>auto: {CATEGORIA_LABEL[categorizarAutomaticamente(nome)]}</option>
