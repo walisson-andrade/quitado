@@ -95,6 +95,16 @@ export const criarFaturaUpload: Handler = async ({ db, body }) => {
   if (input.tipoOrigem === "csv_nubank") {
     itens = normalizeItensFatura(parseNubankCsv(buffer.toString("utf-8")));
     bancoSugerido = "Nubank"; // caminho CSV é só pro extrato do Nubank, sem ambiguidade.
+    // O CSV não vem com "mês de referência" impresso (ao contrário do PDF,
+    // lido pelo Gemini) — chuta a data mais recente entre os itens, já que o
+    // ciclo do cartão fecha no meio do mês e essa é a melhor pista de qual
+    // mês essa fatura representa. Só um chute inicial: o usuário confere e
+    // ajusta na revisão, igual já acontece com o caminho PDF.
+    const dataMaisRecente = itens.reduce<string | null>(
+      (max, item) => (!max || item.data > max ? item.data : max),
+      null,
+    );
+    mesReferenciaSugerido = dataMaisRecente?.slice(0, 7) ?? null;
   } else {
     let extracao;
     try {
