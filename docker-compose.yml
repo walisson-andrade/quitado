@@ -20,5 +20,23 @@ services:
       - ./apps/api-dev/src:/repo/apps/api-dev/src
       - blob-storage:/data/blob-storage
 
+  web-dev:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_PROXY_TARGET: http://api-dev:3011
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./packages/shared-types/src:/repo/packages/shared-types/src
+      - ./packages/calc/src:/repo/packages/calc/src
+      - ./apps/web/src:/repo/apps/web/src
+      - ./apps/web/public:/repo/apps/web/public
+      - ./apps/web/index.html:/repo/apps/web/index.html
+      - ./apps/web/vite.config.ts:/repo/apps/web/vite.config.ts
+    depends_on:
+      - api-dev
+
 volumes:
   blob-storage:
