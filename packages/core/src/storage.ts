@@ -56,7 +56,7 @@ let storageInstance: Storage | undefined;
 export function getStorage(): Storage {
   if (storageInstance) return storageInstance;
 
-  storageInstance = process.env.BLOB_READ_WRITE_TOKEN
+  storageInstance = process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID
     ? new VercelBlobStorage()
     : new LocalFsStorage(process.env.LOCAL_STORAGE_DIR ?? "./docker/blob-storage");
 
