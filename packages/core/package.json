@@ -21,7 +21,7 @@
     "@quitado/calc": "workspace:*",
     "@quitado/shared-types": "workspace:*",
     "@google/genai": "^0.15.0",
-    "@vercel/blob": "^0.27.0",
+    "@vercel/blob": "^2.6.0",
     "bcryptjs": "^2.4.3",
     "drizzle-orm": "^0.36.4",
     "jose": "^5.9.6",

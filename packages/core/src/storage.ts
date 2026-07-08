@@ -29,25 +29,22 @@ export class LocalFsStorage implements Storage {
 }
 
 /**
- * Produção (Vercel): Vercel Blob, mantido privado. O upload real do
- * cliente para o Blob acontece direto do browser (client-direct-upload) —
- * esta classe só é usada para ler o arquivo de volta em rotas autenticadas.
+ * Produção (Vercel): Vercel Blob store privado — leitura e escrita exigem
+ * autenticação (OIDC/token), a URL sozinha não abre o arquivo pra ninguém.
+ * Só é usada para ler o arquivo de volta em rotas autenticadas do app.
  */
 export class VercelBlobStorage implements Storage {
-  // Vercel Blob não tem ACL privada nativa — a "privacidade" vem de (a) URL
-  // com sufixo aleatório imprevisível e (b) nunca entregar essa URL ao
-  // cliente diretamente, só via rota autenticada que faz o fetch aqui e
-  // faz stream do conteúdo de volta.
   async put(key: string, data: Buffer, contentType: string): Promise<string> {
     const { put } = await import("@vercel/blob");
-    const blob = await put(key, data, { access: "public", contentType, addRandomSuffix: true });
+    const blob = await put(key, data, { access: "private", contentType, addRandomSuffix: true });
     return blob.url;
   }
 
   async get(key: string): Promise<Buffer> {
-    const res = await fetch(key);
-    if (!res.ok) throw new Error(`Falha ao ler arquivo do Blob: ${res.status}`);
-    return Buffer.from(await res.arrayBuffer());
+    const { get } = await import("@vercel/blob");
+    const result = await get(key, { access: "private" });
+    if (!result) throw new Error("Arquivo não encontrado no Blob");
+    return Buffer.from(await new Response(result.stream).arrayBuffer());
   }
 }
 
