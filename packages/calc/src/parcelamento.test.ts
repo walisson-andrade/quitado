@@ -175,6 +175,30 @@ describe("parcelamentoContaNoMes — regra híbrida (fatura mais recente conta i
     expect(parcelamentoContaNoMes(item, "2026-07", "2026-07", ultimaFaturaCustom)).toBe(true);
   });
 
+  it("no mês atual, parcela que já chegou na última (ex: 3 de 3) não conta mais, mesmo pertencendo à última fatura", () => {
+    const item = {
+      parcelaAtual: 3,
+      parcelaTotal: 3,
+      mesInicio: "2026-06",
+      continuaIndefinidamente: false,
+      origem: "Inter",
+      faturaImportadaId: "fatura-inter-2",
+    };
+    expect(parcelamentoContaNoMes(item, "2026-07", "2026-07", ultimaFatura)).toBe(false);
+  });
+
+  it("no mês atual, parcela com parcelas restantes (ex: 2 de 4) continua contando por inteiro", () => {
+    const item = {
+      parcelaAtual: 2,
+      parcelaTotal: 4,
+      mesInicio: "2026-06",
+      continuaIndefinidamente: false,
+      origem: "Inter",
+      faturaImportadaId: "fatura-inter-2",
+    };
+    expect(parcelamentoContaNoMes(item, "2026-07", "2026-07", ultimaFatura)).toBe(true);
+  });
+
   it("calcularTotalParcelamentosNoMesHibrido soma pela regra híbrida no mês atual", () => {
     const itens = [
       {

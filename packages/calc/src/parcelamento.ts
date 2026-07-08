@@ -74,6 +74,14 @@ export type ParcelamentoComFatura = ParcelamentoAtivoInput & {
  * terminam/são à-vista de um mês anterior, mesmo que a fatura real ainda
  * cobre esse valor. Meses futuros (projeção) e Custos Fixos (origem
  * manual/null) continuam usando só `parcelaAindaAtiva`.
+ *
+ * Exceção: um item PARCELADO (parcelaTotal > 1) que já chegou na última
+ * parcela nessa mesma fatura (ex: "3 de 3") não tem próxima cobrança —
+ * diferente do à-vista (parcelaTotal 1), que sempre representa a fatura
+ * inteira daquele ciclo e deve continuar contando por inteiro enquanto for
+ * a última confirmada. Sem essa exceção, uma compra parcelada que já
+ * terminou continuaria sendo cobrada pra sempre enquanto o usuário não
+ * importasse uma fatura mais nova daquele cartão.
  */
 export function parcelamentoContaNoMes(
   p: ParcelamentoComFatura,
@@ -82,7 +90,8 @@ export function parcelamentoContaNoMes(
   ultimaFaturaPorOrigem: UltimaFaturaPorOrigem,
 ): boolean {
   const origemDeFatura = !!p.origem && p.origem !== "manual";
-  if (origemDeFatura && mes === mesAtual && p.faturaImportadaId) {
+  const parcelaJaEncerrada = !p.continuaIndefinidamente && p.parcelaTotal > 1 && p.parcelaAtual >= p.parcelaTotal;
+  if (origemDeFatura && mes === mesAtual && p.faturaImportadaId && !parcelaJaEncerrada) {
     const ultimaFaturaId = ultimaFaturaPorOrigem[p.origem as string];
     if (ultimaFaturaId) return p.faturaImportadaId === ultimaFaturaId;
   }
