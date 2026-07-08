@@ -10,8 +10,25 @@ export function calcularRendaBRL(salarioEurCents: number, cotacaoEurBrl: number)
   return Math.round(salarioEurCents * cotacaoEurBrl);
 }
 
-export function calcularTotalDespesasFixas(despesas: DespesaFixa[]): number {
-  return despesas.filter((d) => d.ativo).reduce((acc, d) => acc + d.valorCents, 0);
+/** Valor pontual diferente do normal pra uma despesa fixa num mês específico — ver `despesaFixaOverrides` no schema. */
+export type DespesaFixaOverrideInput = { despesaFixaId: string; mesReferencia: MesReferencia; valorCents: number };
+
+/** Valor efetivo da despesa fixa nesse mês — usa o override se houver um pra esse mês, senão o valor base. */
+export function valorDespesaFixaNoMes(
+  d: DespesaFixa,
+  mes: MesReferencia,
+  overrides: DespesaFixaOverrideInput[] = [],
+): number {
+  const override = overrides.find((o) => o.despesaFixaId === d.id && o.mesReferencia === mes);
+  return override ? override.valorCents : d.valorCents;
+}
+
+export function calcularTotalDespesasFixas(
+  despesas: DespesaFixa[],
+  mes: MesReferencia,
+  overrides: DespesaFixaOverrideInput[] = [],
+): number {
+  return despesas.filter((d) => d.ativo).reduce((acc, d) => acc + valorDespesaFixaNoMes(d, mes, overrides), 0);
 }
 
 export function calcularTotalItensVariaveisNoMes(
@@ -48,6 +65,18 @@ export function calcularTotalRecebidoDevedoresNoMes(
     .reduce((acc, p) => acc + p.valorCents, 0);
 }
 
+/** Aporte de meta de poupança guardado num mês — dinheiro que sai do saldo livre pra poupança. */
+export type MetaAporteInput = { mesReferencia: MesReferencia; valorCents: number };
+
+export function calcularTotalAportesMetaNoMes(
+  aportes: MetaAporteInput[],
+  mesReferencia: MesReferencia,
+): number {
+  return aportes
+    .filter((a) => a.mesReferencia === mesReferencia)
+    .reduce((acc, a) => acc + a.valorCents, 0);
+}
+
 export interface SaldoMensalInput {
   rendaCents: number;
   despesasFixas: DespesaFixa[];
@@ -55,6 +84,10 @@ export interface SaldoMensalInput {
   itensVariaveis: ItemVariavel[];
   reembolsos: Reembolso[];
   parcelasDevedor?: ParcelaDevedorAtivoInput[];
+  /** Aportes de meta de poupança já guardados — contam como saída do saldo livre no mês em que foram registrados. */
+  aportesMeta?: MetaAporteInput[];
+  /** Valores pontuais diferentes do normal pra despesas fixas em meses específicos. */
+  despesaFixaOverrides?: DespesaFixaOverrideInput[];
   mesReferencia: MesReferencia;
   /**
    * Mês real de hoje + última fatura confirmada por banco — quando
@@ -73,14 +106,19 @@ export interface SaldoMensalResultado {
   itensVariaveisCents: number;
   reembolsosCents: number;
   recebidoDevedoresCents: number;
-  /** despesas brutas - reembolsos - parcelas de devedor já pagas no mês */
+  aportesMetaCents: number;
+  /** despesas brutas + aportes de meta - reembolsos - parcelas de devedor já pagas no mês */
   totalDespesasCents: number;
   saldoCents: number;
 }
 
 /** Nenhum total aqui é hardcoded — tudo derivado das listas-fonte, igual à planilha original. */
 export function calcularSaldoMensal(input: SaldoMensalInput): SaldoMensalResultado {
-  const despesasFixasCents = calcularTotalDespesasFixas(input.despesasFixas);
+  const despesasFixasCents = calcularTotalDespesasFixas(
+    input.despesasFixas,
+    input.mesReferencia,
+    input.despesaFixaOverrides ?? [],
+  );
   const parcelamentosCents = input.mesAtual
     ? calcularTotalParcelamentosNoMesHibrido(
         input.parcelamentos,
@@ -95,9 +133,15 @@ export function calcularSaldoMensal(input: SaldoMensalInput): SaldoMensalResulta
     input.parcelasDevedor ?? [],
     input.mesReferencia,
   );
+  const aportesMetaCents = calcularTotalAportesMetaNoMes(input.aportesMeta ?? [], input.mesReferencia);
 
   const totalDespesasCents =
-    despesasFixasCents + parcelamentosCents + itensVariaveisCents - reembolsosCents - recebidoDevedoresCents;
+    despesasFixasCents +
+    parcelamentosCents +
+    itensVariaveisCents +
+    aportesMetaCents -
+    reembolsosCents -
+    recebidoDevedoresCents;
 
   return {
     rendaCents: input.rendaCents,
@@ -106,6 +150,7 @@ export function calcularSaldoMensal(input: SaldoMensalInput): SaldoMensalResulta
     itensVariaveisCents,
     reembolsosCents,
     recebidoDevedoresCents,
+    aportesMetaCents,
     totalDespesasCents,
     saldoCents: input.rendaCents - totalDespesasCents,
   };

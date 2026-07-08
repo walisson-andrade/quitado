@@ -1,9 +1,134 @@
 import { useEffect, useState } from "react";
-import { authApi, configApi } from "../api/resources.js";
+import { Pencil, Trash2 } from "lucide-react";
+import { authApi, cartoesApi, configApi } from "../api/resources.js";
 import { ApiError } from "../api/client.js";
-import type { ConfigRow } from "../api/types.js";
+import type { CartaoRow, ConfigRow } from "../api/types.js";
 import { Field } from "../components/Field.js";
+import { MesInput } from "../components/MesInput.js";
 import { styles } from "../styles.js";
+
+function LinhaCartao({
+  item,
+  onSalvarEdicao,
+  onRemover,
+}: {
+  item: CartaoRow;
+  onSalvarEdicao: (patch: { nome: string; diaVencimento: number | null }) => void;
+  onRemover: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [nome, setNome] = useState(item.nome);
+  const [dia, setDia] = useState(item.diaVencimento ? String(item.diaVencimento) : "");
+
+  function salvar() {
+    if (!nome.trim()) return;
+    const diaVencimento = dia.trim() ? Math.min(Math.max(Number(dia), 1), 31) : null;
+    onSalvarEdicao({ nome: nome.trim(), diaVencimento });
+    setEditando(false);
+  }
+
+  if (editando) {
+    return (
+      <div style={{ ...styles.listRow, flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+        <div style={styles.formRow}>
+          <Field label="Nome">
+            <input value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} />
+          </Field>
+          <Field label="Dia venc.">
+            <input placeholder="ex: 21" value={dia} onChange={(e) => setDia(e.target.value)} style={styles.inputMono} />
+          </Field>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="q-btn" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setEditando(false)}>
+            Cancelar
+          </button>
+          <button className="q-btn" style={{ ...styles.button, flex: 1 }} onClick={salvar}>
+            Salvar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.listRow}>
+      <div style={styles.listRowMain}>
+        <span>{item.nome}</span>
+        <span style={styles.panelHint}>{item.diaVencimento ? `vence dia ${item.diaVencimento}` : "sem dia definido"}</span>
+      </div>
+      <div style={styles.listRowActions}>
+        <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={() => setEditando(true)} aria-label="Editar">
+          <Pencil size={14} color="var(--q-blue)" />
+        </button>
+        <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={onRemover} aria-label="Remover">
+          <Trash2 size={14} color="var(--q-orange)" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SecaoCartoes() {
+  const [cartoes, setCartoes] = useState<CartaoRow[]>([]);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoDia, setNovoDia] = useState("");
+
+  function carregar() {
+    cartoesApi.listar().then(setCartoes);
+  }
+
+  useEffect(carregar, []);
+
+  async function adicionar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!novoNome.trim()) return;
+    const diaVencimento = novoDia.trim() ? Math.min(Math.max(Number(novoDia), 1), 31) : null;
+    await cartoesApi.criar({ nome: novoNome.trim(), diaVencimento });
+    setNovoNome("");
+    setNovoDia("");
+    carregar();
+  }
+
+  async function salvarEdicao(id: string, patch: { nome: string; diaVencimento: number | null }) {
+    await cartoesApi.atualizar(id, patch);
+    carregar();
+  }
+
+  async function remover(id: string) {
+    await cartoesApi.remover(id);
+    carregar();
+  }
+
+  return (
+    <section className="q-surface" style={styles.panel}>
+      <div style={styles.panelHeadRow}>
+        <h3 style={styles.panelTitle}>Cartões</h3>
+        <span style={styles.panelHint}>dia de vencimento de cada fatura (Nubank, Santander, Inter, etc)</span>
+      </div>
+
+      {cartoes.map((item) => (
+        <LinhaCartao
+          key={item.id}
+          item={item}
+          onSalvarEdicao={(patch) => salvarEdicao(item.id, patch)}
+          onRemover={() => remover(item.id)}
+        />
+      ))}
+
+      <form onSubmit={adicionar} style={{ ...styles.addPersonRow, marginTop: cartoes.length > 0 ? 10 : 0 }}>
+        <Field label="Novo cartão">
+          <input placeholder="ex: Nubank Walisson" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} style={styles.input} />
+        </Field>
+        <Field label="Dia venc.">
+          <input placeholder="ex: 21" value={novoDia} onChange={(e) => setNovoDia(e.target.value)} style={{ ...styles.inputMono, width: 70 }} />
+        </Field>
+        <button className="q-btn" type="submit" style={styles.buttonGhost}>
+          Adicionar
+        </button>
+      </form>
+    </section>
+  );
+}
 
 export function Configuracoes({ onLogout }: { onLogout: () => void }) {
   const [config, setConfig] = useState<ConfigRow | null>(null);
@@ -73,7 +198,7 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
           </div>
           <div style={styles.formRow}>
             <Field label="Mês atual (deixe vazio para usar a data do sistema)">
-              <input type="month" value={mesOverride} onChange={(e) => setMesOverride(e.target.value)} style={styles.inputMono} />
+              <MesInput value={mesOverride} onChange={setMesOverride} permiteVazio />
             </Field>
           </div>
           <button className="q-btn" type="submit" style={{ ...styles.button, width: "100%" }}>
@@ -81,6 +206,8 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
           </button>
         </form>
       </section>
+
+      <SecaoCartoes />
 
       <section className="q-surface" style={styles.panel}>
         <div style={styles.panelHeadRow}>

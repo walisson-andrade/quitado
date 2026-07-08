@@ -9,6 +9,7 @@ export function SummaryCard({
   foot,
   progress,
   delayMs = 0,
+  action,
 }: {
   label: string;
   value: string;
@@ -17,6 +18,7 @@ export function SummaryCard({
   foot: string;
   progress?: number;
   delayMs?: number;
+  action?: ReactNode;
 }) {
   return (
     <div className="q-surface q-surface-hover q-rise-in" style={{ ...styles.card, animationDelay: `${delayMs}ms` }}>
@@ -34,6 +36,7 @@ export function SummaryCard({
         </div>
       )}
       <div style={styles.cardFoot}>{foot}</div>
+      {action}
     </div>
   );
 }

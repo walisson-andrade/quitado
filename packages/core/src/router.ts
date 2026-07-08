@@ -1,8 +1,11 @@
 import type { Handler } from "./handlers/types.js";
 import { withAuth } from "./handlers/auth.js";
 import * as authHandlers from "./handlers/auth.js";
+import * as cartoesHandlers from "./handlers/cartoes.js";
 import * as configHandlers from "./handlers/config.js";
+import * as contaPagamentosHandlers from "./handlers/contaPagamentos.js";
 import * as dashboardHandlers from "./handlers/dashboard.js";
+import * as despesaFixaOverridesHandlers from "./handlers/despesaFixaOverrides.js";
 import * as despesasFixasHandlers from "./handlers/despesasFixas.js";
 import * as devedoresHandlers from "./handlers/devedores.js";
 import * as faturasHandlers from "./handlers/faturas.js";
@@ -50,6 +53,22 @@ export const routes: Route[] = [
     method: "DELETE",
     pattern: "/despesas-fixas/:id",
     handler: protegida(despesasFixasHandlers.removerDespesaFixa),
+  },
+
+  {
+    method: "GET",
+    pattern: "/despesa-fixa-overrides",
+    handler: protegida(despesaFixaOverridesHandlers.listarDespesaFixaOverrides),
+  },
+  {
+    method: "POST",
+    pattern: "/despesa-fixa-overrides",
+    handler: protegida(despesaFixaOverridesHandlers.upsertDespesaFixaOverride),
+  },
+  {
+    method: "DELETE",
+    pattern: "/despesa-fixa-overrides/:id",
+    handler: protegida(despesaFixaOverridesHandlers.removerDespesaFixaOverride),
   },
 
   { method: "GET", pattern: "/parcelamentos", handler: protegida(parcelamentosHandlers.listarParcelamentos) },
@@ -101,8 +120,40 @@ export const routes: Route[] = [
   { method: "POST", pattern: "/reembolsos", handler: protegida(reembolsosHandlers.criarReembolso) },
   { method: "DELETE", pattern: "/reembolsos/:id", handler: protegida(reembolsosHandlers.removerReembolso) },
 
+  { method: "GET", pattern: "/cartoes", handler: protegida(cartoesHandlers.listarCartoes) },
+  { method: "POST", pattern: "/cartoes", handler: protegida(cartoesHandlers.criarCartao) },
+  { method: "PATCH", pattern: "/cartoes/:id", handler: protegida(cartoesHandlers.atualizarCartao) },
+  { method: "DELETE", pattern: "/cartoes/:id", handler: protegida(cartoesHandlers.removerCartao) },
+
+  {
+    method: "GET",
+    pattern: "/conta-pagamentos",
+    handler: protegida(contaPagamentosHandlers.listarContaPagamentos),
+  },
+  {
+    method: "POST",
+    pattern: "/conta-pagamentos",
+    handler: protegida(contaPagamentosHandlers.marcarContaPagamento),
+  },
+
   { method: "GET", pattern: "/meta-poupanca", handler: protegida(metaPoupancaHandlers.obterMetaPoupanca) },
   { method: "PUT", pattern: "/meta-poupanca", handler: protegida(metaPoupancaHandlers.atualizarMetaPoupanca) },
+  { method: "GET", pattern: "/meta-poupanca/aportes", handler: protegida(metaPoupancaHandlers.listarAportesMeta) },
+  {
+    method: "POST",
+    pattern: "/meta-poupanca/aportes",
+    handler: protegida(metaPoupancaHandlers.registrarAporteMeta),
+  },
+  {
+    method: "PATCH",
+    pattern: "/meta-poupanca/aportes/:id",
+    handler: protegida(metaPoupancaHandlers.editarAporteMeta),
+  },
+  {
+    method: "DELETE",
+    pattern: "/meta-poupanca/aportes/:id",
+    handler: protegida(metaPoupancaHandlers.excluirAporteMeta),
+  },
 
   { method: "GET", pattern: "/faturas", handler: protegida(faturasHandlers.listarFaturas) },
   { method: "POST", pattern: "/faturas", handler: protegida(faturasHandlers.criarFaturaUpload) },
@@ -115,6 +166,7 @@ export const routes: Route[] = [
   { method: "GET", pattern: "/faturas/:id/arquivo", handler: protegida(faturasHandlers.obterArquivoFatura) },
   { method: "POST", pattern: "/faturas/confirmar", handler: protegida(faturasHandlers.confirmarFatura) },
   { method: "POST", pattern: "/faturas/:id/descartar", handler: protegida(faturasHandlers.descartarFatura) },
+  { method: "DELETE", pattern: "/faturas/:id", handler: protegida(faturasHandlers.removerFaturaImportada) },
 ];
 
 export interface MatchResult {

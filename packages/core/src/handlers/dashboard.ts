@@ -10,8 +10,10 @@ import {
 } from "@quitado/calc";
 import {
   appConfig,
+  despesaFixaOverrides,
   despesasFixas,
   itensVariaveis,
+  metaPoupancaAportes,
   parcelamentos,
   parcelasDevedor,
   reembolsos,
@@ -24,15 +26,25 @@ export const obterDashboard: Handler = async ({ db, query }) => {
   const mesAtual = resolverMesAtual(config?.mesAtualOverride ?? null);
   const meses = gerarIntervaloMeses(mesAtual, Number(query.meses ?? 13));
 
-  const [despesas, parcelamentosRows, itensRows, reembolsosRows, parcelasDevedorRows, ultimaFaturaPorOrigem] =
-    await Promise.all([
-      db.select().from(despesasFixas),
-      db.select().from(parcelamentos),
-      db.select().from(itensVariaveis),
-      db.select().from(reembolsos),
-      db.select().from(parcelasDevedor),
-      buscarUltimaFaturaPorOrigem(db),
-    ]);
+  const [
+    despesas,
+    parcelamentosRows,
+    itensRows,
+    reembolsosRows,
+    parcelasDevedorRows,
+    aportesMetaRows,
+    despesaFixaOverridesRows,
+    ultimaFaturaPorOrigem,
+  ] = await Promise.all([
+    db.select().from(despesasFixas),
+    db.select().from(parcelamentos),
+    db.select().from(itensVariaveis),
+    db.select().from(reembolsos),
+    db.select().from(parcelasDevedor),
+    db.select().from(metaPoupancaAportes),
+    db.select().from(despesaFixaOverrides),
+    buscarUltimaFaturaPorOrigem(db),
+  ]);
 
   const eurBrlRate = config ? Number(config.eurBrlRate) : 1;
   const rendaCents = calcularRendaBRL(config?.salarioEurCents ?? 0, eurBrlRate);
@@ -45,12 +57,14 @@ export const obterDashboard: Handler = async ({ db, query }) => {
     itensVariaveis: itensRows,
     reembolsos: reembolsosRows,
     parcelasDevedor: parcelasDevedorRows as ParcelaDevedorAtivoInput[],
+    aportesMeta: aportesMetaRows,
+    despesaFixaOverrides: despesaFixaOverridesRows,
     mesAtual,
     ultimaFaturaPorOrigem,
   });
 
-  const porCategoria = totalPorCategoria(despesas, parcelamentosRows, mesAtual, ultimaFaturaPorOrigem);
-  const porOrigem = totalPorOrigem(despesas, parcelamentosRows, mesAtual, ultimaFaturaPorOrigem);
+  const porCategoria = totalPorCategoria(despesas, parcelamentosRows, mesAtual, ultimaFaturaPorOrigem, despesaFixaOverridesRows);
+  const porOrigem = totalPorOrigem(despesas, parcelamentosRows, mesAtual, ultimaFaturaPorOrigem, despesaFixaOverridesRows);
 
   return {
     status: 200,

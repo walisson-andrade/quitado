@@ -1,10 +1,71 @@
 import { useEffect, useState } from "react";
+import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { calcularAporteNecessario, calcularProgressoMeta, mesesRestantesMeta } from "@quitado/calc";
 import { configApi, dashboardApi, metaPoupancaApi } from "../api/resources.js";
-import type { MetaPoupancaRow } from "../api/types.js";
+import type { MetaAporteRow, MetaPoupancaRow } from "../api/types.js";
 import { Field } from "../components/Field.js";
-import { fmt } from "../format.js";
+import { MesInput } from "../components/MesInput.js";
+import { fmt, mesLabel } from "../format.js";
 import { styles } from "../styles.js";
+
+function LinhaHistoricoAporte({
+  item,
+  onSalvarEdicao,
+  onRemover,
+}: {
+  item: MetaAporteRow;
+  onSalvarEdicao: (patch: { mesReferencia: string; valorCents: number }) => void;
+  onRemover: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [mesReferencia, setMesReferencia] = useState(item.mesReferencia);
+  const [valor, setValor] = useState(String(item.valorCents / 100));
+
+  function salvar() {
+    const valorCents = Math.round(Number(valor.replace(",", ".")) * 100);
+    if (!mesReferencia || !Number.isFinite(valorCents) || valorCents <= 0) return;
+    onSalvarEdicao({ mesReferencia, valorCents });
+    setEditando(false);
+  }
+
+  if (editando) {
+    return (
+      <div style={{ ...styles.listRow, flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+        <div style={styles.formRow}>
+          <Field label="Mês">
+            <MesInput value={mesReferencia} onChange={setMesReferencia} />
+          </Field>
+          <Field label="Valor (R$)">
+            <input value={valor} onChange={(e) => setValor(e.target.value)} style={styles.inputMono} />
+          </Field>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="q-btn" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setEditando(false)}>
+            Cancelar
+          </button>
+          <button className="q-btn" style={{ ...styles.button, flex: 1 }} onClick={salvar}>
+            Salvar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.listRow}>
+      <span>{mesLabel(item.mesReferencia)}</span>
+      <div style={styles.listRowActions}>
+        <span style={{ ...styles.parcelaValor, color: "var(--q-teal)" }}>{fmt(item.valorCents)}</span>
+        <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={() => setEditando(true)} aria-label="Editar">
+          <Pencil size={14} color="var(--q-blue)" />
+        </button>
+        <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={onRemover} aria-label="Remover">
+          <Trash2 size={14} color="var(--q-orange)" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function MetaPoupanca() {
   const [meta, setMeta] = useState<MetaPoupancaRow | null>(null);
@@ -16,6 +77,12 @@ export function MetaPoupanca() {
   const [acumulado, setAcumulado] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [historico, setHistorico] = useState<MetaAporteRow[]>([]);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
+
+  function carregarHistorico() {
+    metaPoupancaApi.listarAportes().then(setHistorico);
+  }
 
   useEffect(() => {
     Promise.all([metaPoupancaApi.obter(), configApi.obter(), dashboardApi.obter()])
@@ -31,30 +98,58 @@ export function MetaPoupanca() {
         }
       })
       .finally(() => setCarregando(false));
+    carregarHistorico();
   }, []);
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     setSalvando(true);
     try {
-      // "Aporte mês atual" é o valor que você acabou de reservar agora — ao
-      // salvar, soma no acumulado (não é um valor planejado estático).
+      // "Aporte mês atual" é o valor que você acabou de reservar agora — vira
+      // um registro no histórico (com o mês) e soma no acumulado no servidor,
+      // pra não ter risco de somar duas vezes se o campo "Já acumulado" também
+      // mudou nessa mesma tela.
       const aporteMesAtualCents = Math.round(Number(aporteMensal.replace(",", ".")) * 100) || 0;
-      const acumuladoAtualCents = Math.round(Number(acumulado.replace(",", ".")) * 100) || 0;
-      const novoAcumuladoCents = acumuladoAtualCents + aporteMesAtualCents;
+      let acumuladoCents = Math.round(Number(acumulado.replace(",", ".")) * 100) || 0;
+
+      if (aporteMesAtualCents > 0 && mesAtual) {
+        const { meta: metaAposAporte } = await metaPoupancaApi.registrarAporte({
+          mesReferencia: mesAtual,
+          valorCents: aporteMesAtualCents,
+        });
+        acumuladoCents = metaAposAporte.acumuladoCents;
+      }
 
       const atualizado = await metaPoupancaApi.atualizar({
         valorAlvoCents: Math.round(Number(valorAlvo.replace(",", ".")) * 100),
         prazo,
         aporteMensalCents: 0,
-        acumuladoCents: novoAcumuladoCents,
+        acumuladoCents,
       });
       setMeta(atualizado);
       setAcumulado(String(atualizado.acumuladoCents / 100));
       setAporteMensal("");
+      carregarHistorico();
     } finally {
       setSalvando(false);
     }
+  }
+
+  // Editar/remover um aporte do histórico ajusta o acumulado no servidor
+  // (ex: precisou tirar parte da grana pra uma emergência) — refletimos o
+  // "Já acumulado" de volta aqui pra tela e a meta ficarem consistentes.
+  async function salvarEdicaoAporte(id: string, patch: { mesReferencia: string; valorCents: number }) {
+    const { meta: metaAtualizada } = await metaPoupancaApi.editarAporte(id, patch);
+    setMeta(metaAtualizada);
+    setAcumulado(String(metaAtualizada.acumuladoCents / 100));
+    carregarHistorico();
+  }
+
+  async function removerAporte(id: string) {
+    const { meta: metaAtualizada } = await metaPoupancaApi.removerAporte(id);
+    setMeta(metaAtualizada);
+    setAcumulado(String(metaAtualizada.acumuladoCents / 100));
+    carregarHistorico();
   }
 
   if (carregando) return <div style={styles.panelHint}>Carregando...</div>;
@@ -72,8 +167,15 @@ export function MetaPoupanca() {
           acumuladoCents: Math.round(Number(acumulado.replace(",", ".")) * 100) || 0,
         }
       : null;
-  const aporteSugeridoCents = metaRascunho && mesAtual ? calcularAporteNecessario(metaRascunho, mesAtual) : null;
-  const mesesRestantes = metaRascunho && mesAtual ? mesesRestantesMeta(metaRascunho.prazo, mesAtual) : null;
+  // Já existe aporte salvo pro mês atual no histórico? Se sim, esse mês já
+  // está contabilizado no acumulado e não entra de novo na conta de meses
+  // restantes — não usa o campo "Aporte mês atual" (ainda não salvo), senão
+  // a sugestão mudaria sozinha assim que o usuário começasse a digitar nele.
+  const mesAtualJaContemplado = mesAtual ? historico.some((h) => h.mesReferencia === mesAtual) : false;
+  const aporteSugeridoCents =
+    metaRascunho && mesAtual ? calcularAporteNecessario(metaRascunho, mesAtual, mesAtualJaContemplado) : null;
+  const mesesRestantes =
+    metaRascunho && mesAtual ? mesesRestantesMeta(metaRascunho.prazo, mesAtual, mesAtualJaContemplado) : null;
   const cabeNoSaldo =
     aporteSugeridoCents !== null && saldoLivreCents !== null ? aporteSugeridoCents <= saldoLivreCents : null;
 
@@ -134,7 +236,7 @@ export function MetaPoupanca() {
             <input placeholder="10000" value={valorAlvo} onChange={(e) => setValorAlvo(e.target.value)} style={styles.inputMono} />
           </Field>
           <Field label="Prazo">
-            <input type="month" value={prazo} onChange={(e) => setPrazo(e.target.value)} style={styles.inputMono} />
+            <MesInput value={prazo} onChange={setPrazo} />
           </Field>
         </div>
         <div style={styles.formRow}>
@@ -152,6 +254,33 @@ export function MetaPoupanca() {
           {salvando ? "Salvando..." : "Salvar meta"}
         </button>
       </form>
+
+      <button
+        className="q-btn"
+        type="button"
+        onClick={() => setHistoricoAberto((v) => !v)}
+        style={{ ...styles.maisParcelasBtn, marginTop: 14, display: "flex", alignItems: "center", gap: 4 }}
+      >
+        <ChevronRight className={`q-chevron${historicoAberto ? " aberto" : ""}`} size={13} color="var(--q-text-muted)" />
+        histórico do que já guardei
+      </button>
+
+      <div className={`q-expand${historicoAberto ? " aberto" : ""}`}>
+        <div style={{ paddingTop: historicoAberto ? 10 : 0, overflow: "hidden" }}>
+          {historico.length === 0 ? (
+            <div style={styles.panelHint}>Nenhum aporte registrado ainda.</div>
+          ) : (
+            historico.map((item) => (
+              <LinhaHistoricoAporte
+                key={item.id}
+                item={item}
+                onSalvarEdicao={(patch) => salvarEdicaoAporte(item.id, patch)}
+                onRemover={() => removerAporte(item.id)}
+              />
+            ))
+          )}
+        </div>
+      </div>
     </section>
   );
 }

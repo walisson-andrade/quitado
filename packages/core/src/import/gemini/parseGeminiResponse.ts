@@ -6,6 +6,12 @@ export interface ParseGeminiResultado {
   itensRejeitados: Array<{ bruto: unknown; motivo: string }>;
   /** 'YYYY-MM' derivado da data de vencimento extraída, ou null se a IA não retornou uma data válida. */
   mesReferenciaSugerido: string | null;
+  /** Nome do titular lido no documento, ou null — só sugestão pra bater com um cartão cadastrado. */
+  titularSugerido: string | null;
+  /** Nome do banco/emissor lido no documento, ou null — mais confiável que o nome do arquivo. */
+  bancoSugerido: string | null;
+  /** Total da fatura impresso no documento (centavos), ou null — usado só pra conferir contra a soma dos itens na revisão. */
+  totalFaturaSugeridoCents: number | null;
 }
 
 /**
@@ -39,6 +45,12 @@ export function parseGeminiResponse(extracao: RawGeminiExtraction): ParseGeminiR
 
   const mesCandidato = extracao.dataVencimento?.slice(0, 7);
   const mesReferenciaSugerido = MesReferenciaSchema.safeParse(mesCandidato).success ? mesCandidato! : null;
+  const titularSugerido = extracao.titular?.trim() || null;
+  const bancoSugerido = extracao.banco?.trim() || null;
+  const totalFaturaSugeridoCents =
+    typeof extracao.totalFatura === "number" && Number.isFinite(extracao.totalFatura)
+      ? Math.round(extracao.totalFatura * 100)
+      : null;
 
-  return { itensValidos, itensRejeitados, mesReferenciaSugerido };
+  return { itensValidos, itensRejeitados, mesReferenciaSugerido, titularSugerido, bancoSugerido, totalFaturaSugeridoCents };
 }

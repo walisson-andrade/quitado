@@ -67,9 +67,10 @@ export type ParcelamentoComFatura = ParcelamentoAtivoInput & {
 
 /**
  * Regra híbrida pra "quanto eu devo esse mês": pra itens vindos de fatura
- * importada (origem Inter/Nubank), o MÊS ATUAL conta o valor inteiro de
- * tudo que pertence à última fatura confirmada daquele banco — não a
- * contagem calendário de parcela, que faria o total cair conforme itens
+ * importada (qualquer cartão/banco — Inter, Nubank, ou um nome customizado
+ * como "Nubank Walisson"), o MÊS ATUAL conta o valor inteiro de tudo que
+ * pertence à última fatura confirmada daquele cartão — não a contagem
+ * calendário de parcela, que faria o total cair conforme itens
  * terminam/são à-vista de um mês anterior, mesmo que a fatura real ainda
  * cobre esse valor. Meses futuros (projeção) e Custos Fixos (origem
  * manual/null) continuam usando só `parcelaAindaAtiva`.
@@ -80,7 +81,7 @@ export function parcelamentoContaNoMes(
   mesAtual: MesReferencia,
   ultimaFaturaPorOrigem: UltimaFaturaPorOrigem,
 ): boolean {
-  const origemDeFatura = p.origem === "Inter" || p.origem === "Nubank";
+  const origemDeFatura = !!p.origem && p.origem !== "manual";
   if (origemDeFatura && mes === mesAtual && p.faturaImportadaId) {
     const ultimaFaturaId = ultimaFaturaPorOrigem[p.origem as string];
     if (ultimaFaturaId) return p.faturaImportadaId === ultimaFaturaId;

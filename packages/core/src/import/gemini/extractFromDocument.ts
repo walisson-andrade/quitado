@@ -5,6 +5,9 @@ const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     dataVencimento: { type: Type.STRING },
+    totalFatura: { type: Type.NUMBER, nullable: true },
+    banco: { type: Type.STRING, nullable: true },
+    titular: { type: Type.STRING, nullable: true },
     itens: {
       type: Type.ARRAY,
       items: {
@@ -38,6 +41,12 @@ export interface RawGeminiItem {
 export interface RawGeminiExtraction {
   /** Data de vencimento da fatura como um todo — base confiável para o mês das parcelas. */
   dataVencimento: string;
+  /** Total da fatura impresso no documento (reais), ou null se não achou — usado só pra conferir contra a soma dos itens. */
+  totalFatura: number | null;
+  /** Nome do banco/emissor lido no documento, ou null se não achou — só sugestão, nunca decide sozinho. */
+  banco: string | null;
+  /** Nome do titular lido no documento, ou null se não achou — só sugestão, nunca decide sozinho. */
+  titular: string | null;
   itens: RawGeminiItem[];
 }
 

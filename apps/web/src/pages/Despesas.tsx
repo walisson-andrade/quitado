@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Coins, Pencil, Trash2 } from "lucide-react";
 import { CATEGORIA_LABEL, categorizarAutomaticamente, parcelamentoContaNoMes, resolverMesAtual } from "@quitado/calc";
-import { configApi, despesasFixasApi, faturasApi, parcelamentosApi } from "../api/resources.js";
-import type { DespesaFixaRow, ParcelamentoRow } from "../api/types.js";
+import { configApi, despesaFixaOverridesApi, despesasFixasApi, faturasApi, parcelamentosApi } from "../api/resources.js";
+import type { DespesaFixaOverrideRow, DespesaFixaRow, ParcelamentoRow } from "../api/types.js";
 import { CategoriaSelect } from "../components/CategoriaSelect.js";
 import { Field } from "../components/Field.js";
-import { COR_POR_ORIGEM } from "../components/OrigemChart.js";
+import { MesInput } from "../components/MesInput.js";
+import { corPorOrigem } from "../components/OrigemChart.js";
 import { GrupoExpansivel } from "../components/GrupoExpansivel.js";
-import { fmt } from "../format.js";
+import { fmt, mesLabel } from "../format.js";
 import { styles } from "../styles.js";
 
 const optionStyle = { background: "var(--q-card-bg)", color: "var(--q-text)" };
@@ -44,25 +45,30 @@ function LinhaParcelamento({
     parcelaAtual: number;
     parcelaTotal: number;
     continuaIndefinidamente: boolean;
+    diaVencimento: number | null;
   }) => void;
   onRemover: () => void;
 }) {
+  const ehManual = item.origem === "manual" || item.origem == null;
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState(item.nome);
   const [valor, setValor] = useState(String(item.valorParcelaCents / 100));
   const [parcelaAtual, setParcelaAtual] = useState(String(item.parcelaAtual));
   const [parcelaTotal, setParcelaTotal] = useState(String(item.parcelaTotal));
   const [continuaIndefinidamente, setContinuaIndefinidamente] = useState(item.continuaIndefinidamente);
+  const [diaVencimento, setDiaVencimento] = useState(item.diaVencimento ? String(item.diaVencimento) : "");
 
   function salvar() {
     const valorParcelaCents = Math.round(Number(valor.replace(",", ".")) * 100);
     if (!nome.trim() || !Number.isFinite(valorParcelaCents) || valorParcelaCents <= 0) return;
+    const dia = diaVencimento.trim() ? Math.min(Math.max(Number(diaVencimento), 1), 31) : null;
     onSalvarEdicao({
       nome: nome.trim(),
       valorParcelaCents,
       parcelaAtual: Number(parcelaAtual) || 1,
       parcelaTotal: Number(parcelaTotal) || 1,
       continuaIndefinidamente,
+      diaVencimento: dia,
     });
     setEditando(false);
   }
@@ -85,6 +91,11 @@ function LinhaParcelamento({
           <Field label="Total de parcelas">
             <input value={parcelaTotal} onChange={(e) => setParcelaTotal(e.target.value)} style={styles.inputMono} />
           </Field>
+          {ehManual && (
+            <Field label="Dia venc.">
+              <input placeholder="ex: 08" value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} style={styles.inputMono} />
+            </Field>
+          )}
         </div>
         <label style={{ ...styles.cardLabel, display: "flex", alignItems: "center", gap: 6 }}>
           <input type="checkbox" checked={continuaIndefinidamente} onChange={(e) => setContinuaIndefinidamente(e.target.checked)} />
@@ -105,7 +116,10 @@ function LinhaParcelamento({
   return (
     <div style={styles.listRow}>
       <div style={styles.listRowMain}>
-        <span>{item.nome}</span>
+        <span>
+          {item.nome}
+          {ehManual && item.diaVencimento && <span style={styles.panelHint}> · dia {item.diaVencimento}</span>}
+        </span>
         <span style={styles.parcelaValor}>
           {fmt(item.valorParcelaCents)}
           {item.continuaIndefinidamente ? " · sem término" : ` · parcela ${item.parcelaAtual}/${item.parcelaTotal}`}
@@ -126,26 +140,45 @@ function LinhaParcelamento({
 
 function LinhaDespesaFixa({
   item,
+  mesAtual,
+  override,
   onMudarCategoria,
   onSalvarEdicao,
   onDesativar,
   onRemover,
+  onSalvarOverride,
+  onRemoverOverride,
 }: {
   item: DespesaFixaRow;
+  mesAtual: string;
+  override: DespesaFixaOverrideRow | null;
   onMudarCategoria: (categoria: string | null) => void;
-  onSalvarEdicao: (patch: { nome: string; valorCents: number }) => void;
+  onSalvarEdicao: (patch: { nome: string; valorCents: number; diaVencimento: number | null }) => void;
   onDesativar: () => void;
   onRemover: () => void;
+  onSalvarOverride: (valorCents: number) => void;
+  onRemoverOverride: () => void;
 }) {
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState(item.nome);
   const [valor, setValor] = useState(String(item.valorCents / 100));
+  const [diaVencimento, setDiaVencimento] = useState(item.diaVencimento ? String(item.diaVencimento) : "");
+  const [editandoOverride, setEditandoOverride] = useState(false);
+  const [valorOverride, setValorOverride] = useState(override ? String(override.valorCents / 100) : "");
 
   function salvar() {
     const valorCents = Math.round(Number(valor.replace(",", ".")) * 100);
     if (!nome.trim() || !Number.isFinite(valorCents) || valorCents <= 0) return;
-    onSalvarEdicao({ nome: nome.trim(), valorCents });
+    const dia = diaVencimento.trim() ? Math.min(Math.max(Number(diaVencimento), 1), 31) : null;
+    onSalvarEdicao({ nome: nome.trim(), valorCents, diaVencimento: dia });
     setEditando(false);
+  }
+
+  function salvarOverride() {
+    const valorCents = Math.round(Number(valorOverride.replace(",", ".")) * 100);
+    if (!Number.isFinite(valorCents) || valorCents <= 0) return;
+    onSalvarOverride(valorCents);
+    setEditandoOverride(false);
   }
 
   if (editando) {
@@ -157,6 +190,9 @@ function LinhaDespesaFixa({
           </Field>
           <Field label="Valor (R$)">
             <input value={valor} onChange={(e) => setValor(e.target.value)} style={styles.inputMono} />
+          </Field>
+          <Field label="Dia venc.">
+            <input placeholder="ex: 10" value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} style={styles.inputMono} />
           </Field>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -172,23 +208,63 @@ function LinhaDespesaFixa({
   }
 
   return (
-    <div style={styles.listRow}>
-      <div style={styles.listRowMain}>
-        <span>{item.nome}</span>
-        <span style={styles.parcelaValor}>{fmt(item.valorCents)}</span>
+    <div style={{ ...styles.listRow, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={styles.listRowMain}>
+          <span>
+            {item.nome}
+            {item.diaVencimento && <span style={styles.panelHint}> · dia {item.diaVencimento}</span>}
+          </span>
+          <span style={{ ...styles.parcelaValor, color: override ? "var(--q-orange)" : undefined }}>
+            {fmt(override ? override.valorCents : item.valorCents)}
+            {override && <span style={styles.panelHint}> · personalizado esse mês (normal {fmt(item.valorCents)})</span>}
+          </span>
+        </div>
+        <div style={styles.listRowActions}>
+          <CategoriaMiniSelect nome={item.nome} valor={item.categoria} onChange={onMudarCategoria} />
+          <button
+            className="q-btn"
+            style={{ ...styles.buttonGhost, padding: 8 }}
+            onClick={() => setEditandoOverride((v) => !v)}
+            aria-label="Valor diferente esse mês"
+            title="Valor diferente esse mês"
+          >
+            <Coins size={14} color={override ? "var(--q-orange)" : "var(--q-text-muted)"} />
+          </button>
+          <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={() => setEditando(true)} aria-label="Editar">
+            <Pencil size={14} color="var(--q-blue)" />
+          </button>
+          <button className="q-btn" style={styles.buttonGhost} onClick={onDesativar}>
+            Desativar
+          </button>
+          <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={onRemover} aria-label="Remover">
+            <Trash2 size={14} color="var(--q-orange)" />
+          </button>
+        </div>
       </div>
-      <div style={styles.listRowActions}>
-        <CategoriaMiniSelect nome={item.nome} valor={item.categoria} onChange={onMudarCategoria} />
-        <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={() => setEditando(true)} aria-label="Editar">
-          <Pencil size={14} color="var(--q-blue)" />
-        </button>
-        <button className="q-btn" style={styles.buttonGhost} onClick={onDesativar}>
-          Desativar
-        </button>
-        <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={onRemover} aria-label="Remover">
-          <Trash2 size={14} color="var(--q-orange)" />
-        </button>
-      </div>
+      {editandoOverride && (
+        <div style={styles.formRow}>
+          <Field label={`Valor só em ${mesLabel(mesAtual)} (R$)`}>
+            <input placeholder={String(item.valorCents / 100)} value={valorOverride} onChange={(e) => setValorOverride(e.target.value)} style={styles.inputMono} />
+          </Field>
+          <button className="q-btn" style={styles.button} onClick={salvarOverride}>
+            Salvar
+          </button>
+          {override && (
+            <button
+              className="q-btn"
+              style={styles.buttonGhost}
+              onClick={() => {
+                onRemoverOverride();
+                setEditandoOverride(false);
+                setValorOverride("");
+              }}
+            >
+              Voltar ao normal
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -198,20 +274,35 @@ export function Despesas() {
   const [parcelamentos, setParcelamentos] = useState<ParcelamentoRow[]>([]);
   const [ultimaFaturaPorOrigem, setUltimaFaturaPorOrigem] = useState<Record<string, string>>({});
   const [mesAtual, setMesAtual] = useState(resolverMesAtual(null));
+  const [overrides, setOverrides] = useState<DespesaFixaOverrideRow[]>([]);
   const [carregando, setCarregando] = useState(true);
 
-  function carregar() {
-    Promise.all([despesasFixasApi.listar(), parcelamentosApi.listar(), configApi.obter(), faturasApi.ultimaPorOrigem()])
-      .then(([d, p, config, ultimaFatura]) => {
-        setDespesasFixas(d);
-        setParcelamentos(p);
-        setMesAtual(config.mesAtual);
-        setUltimaFaturaPorOrigem(ultimaFatura);
-      })
-      .finally(() => setCarregando(false));
+  async function carregar() {
+    const [d, p, config, ultimaFatura] = await Promise.all([
+      despesasFixasApi.listar(),
+      parcelamentosApi.listar(),
+      configApi.obter(),
+      faturasApi.ultimaPorOrigem(),
+    ]);
+    setDespesasFixas(d);
+    setParcelamentos(p);
+    setMesAtual(config.mesAtual);
+    setUltimaFaturaPorOrigem(ultimaFatura);
+    setOverrides(await despesaFixaOverridesApi.listar(config.mesAtual));
   }
 
-  useEffect(carregar, []);
+  useEffect(() => {
+    carregar().finally(() => setCarregando(false));
+  }, []);
+
+  async function salvarOverride(despesaFixaId: string, valorCents: number) {
+    await despesaFixaOverridesApi.salvar({ despesaFixaId, mesReferencia: mesAtual, valorCents });
+    carregar();
+  }
+  async function removerOverride(overrideId: string) {
+    await despesaFixaOverridesApi.remover(overrideId);
+    carregar();
+  }
 
   if (carregando) return <div style={styles.panelHint}>Carregando...</div>;
 
@@ -220,15 +311,24 @@ export function Despesas() {
     parcelamentoContaNoMes(p, mesAtual, mesAtual, ultimaFaturaPorOrigem),
   );
 
-  const interItens = parcelamentosAtivos.filter((p) => p.origem === "Inter");
-  const nubankItens = parcelamentosAtivos.filter((p) => p.origem === "Nubank");
-  const fixoParcelamentos = parcelamentosAtivos.filter((p) => p.origem !== "Inter" && p.origem !== "Nubank");
+  // Cada cartão/banco de fatura importada (Inter, Nubank, ou um nome
+  // customizado como "Nubank Walisson") vira seu próprio grupo — só cai em
+  // "Custos Fixos" quem não veio de fatura nenhuma (origem "manual" ou null).
+  const fixoParcelamentos = parcelamentosAtivos.filter((p) => !p.origem || p.origem === "manual");
+  const origensCartao = Array.from(
+    new Set(parcelamentosAtivos.filter((p) => p.origem && p.origem !== "manual").map((p) => p.origem!)),
+  ).sort();
+  const itensPorOrigem = new Map(origensCartao.map((origem) => [origem, parcelamentosAtivos.filter((p) => p.origem === origem)]));
 
-  const totalInter = interItens.reduce((acc, p) => acc + p.valorParcelaCents, 0);
-  const totalNubank = nubankItens.reduce((acc, p) => acc + p.valorParcelaCents, 0);
+  const valorEfetivoDespesaFixa = (d: DespesaFixaRow) => overrides.find((o) => o.despesaFixaId === d.id)?.valorCents ?? d.valorCents;
   const totalFixo =
-    despesasFixasAtivas.reduce((acc, d) => acc + d.valorCents, 0) +
+    despesasFixasAtivas.reduce((acc, d) => acc + valorEfetivoDespesaFixa(d), 0) +
     fixoParcelamentos.reduce((acc, p) => acc + p.valorParcelaCents, 0);
+  const totalCartoes = origensCartao.reduce(
+    (acc, origem) => acc + itensPorOrigem.get(origem)!.reduce((s, p) => s + p.valorParcelaCents, 0),
+    0,
+  );
+  const totalGeral = totalFixo + totalCartoes;
 
   const ehAVista = (p: ParcelamentoRow) => p.parcelaTotal === 1 && !p.continuaIndefinidamente;
 
@@ -238,7 +338,14 @@ export function Despesas() {
   }
   async function salvarEdicaoParcelamento(
     id: string,
-    patch: { nome: string; valorParcelaCents: number; parcelaAtual: number; parcelaTotal: number; continuaIndefinidamente: boolean },
+    patch: {
+      nome: string;
+      valorParcelaCents: number;
+      parcelaAtual: number;
+      parcelaTotal: number;
+      continuaIndefinidamente: boolean;
+      diaVencimento: number | null;
+    },
   ) {
     await parcelamentosApi.atualizar(id, patch);
     carregar();
@@ -251,7 +358,7 @@ export function Despesas() {
     await despesasFixasApi.atualizar(id, { categoria });
     carregar();
   }
-  async function salvarEdicaoDespesaFixa(id: string, patch: { nome: string; valorCents: number }) {
+  async function salvarEdicaoDespesaFixa(id: string, patch: { nome: string; valorCents: number; diaVencimento: number | null }) {
     await despesasFixasApi.atualizar(id, patch);
     carregar();
   }
@@ -267,36 +374,37 @@ export function Despesas() {
   return (
     <>
       <section className="q-surface" style={styles.panel}>
-        <div style={styles.panelHeadRow}>
-          <h3 style={styles.panelTitle}>Despesas</h3>
-          <span style={styles.panelHint}>agrupado por origem — clique pra abrir e conferir os itens</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 12 }}>
+          <div style={{ ...styles.panelHeadRow, marginBottom: 0 }}>
+            <h3 style={styles.panelTitle}>Despesas</h3>
+            <span style={styles.panelHint}>agrupado por origem — clique pra abrir e conferir os itens</span>
+          </div>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-title)", fontWeight: 600, whiteSpace: "nowrap" }}>
+            {fmt(totalGeral)}
+          </span>
         </div>
 
-        <GrupoExpansivel titulo="Fatura Inter" totalCents={totalInter} quantidadeItens={interItens.length} corAccent={COR_POR_ORIGEM.Inter!} abertoPorPadrao>
-          <GrupoDeCompras
-            itens={interItens}
-            ehAVista={ehAVista}
-            onMudarCategoria={mudarCategoriaParcelamento}
-            onSalvarEdicao={salvarEdicaoParcelamento}
-            onRemover={removerParcelamento}
-          />
-        </GrupoExpansivel>
-
-        <GrupoExpansivel titulo="Fatura Nubank" totalCents={totalNubank} quantidadeItens={nubankItens.length} corAccent={COR_POR_ORIGEM.Nubank!}>
-          <GrupoDeCompras
-            itens={nubankItens}
-            ehAVista={ehAVista}
-            onMudarCategoria={mudarCategoriaParcelamento}
-            onSalvarEdicao={salvarEdicaoParcelamento}
-            onRemover={removerParcelamento}
-          />
-        </GrupoExpansivel>
+        {origensCartao.map((origem) => {
+          const itens = itensPorOrigem.get(origem)!;
+          const total = itens.reduce((acc, p) => acc + p.valorParcelaCents, 0);
+          return (
+            <GrupoExpansivel key={origem} titulo={`Fatura ${origem}`} totalCents={total} quantidadeItens={itens.length} corAccent={corPorOrigem(origem)}>
+              <GrupoDeCompras
+                itens={itens}
+                ehAVista={ehAVista}
+                onMudarCategoria={mudarCategoriaParcelamento}
+                onSalvarEdicao={salvarEdicaoParcelamento}
+                onRemover={removerParcelamento}
+              />
+            </GrupoExpansivel>
+          );
+        })}
 
         <GrupoExpansivel
           titulo="Custos Fixos"
           totalCents={totalFixo}
           quantidadeItens={despesasFixasAtivas.length + fixoParcelamentos.length}
-          corAccent={COR_POR_ORIGEM.fixo!}
+          corAccent={corPorOrigem("fixo")}
         >
           {despesasFixasAtivas.length > 0 && (
             <>
@@ -305,10 +413,17 @@ export function Despesas() {
                 <LinhaDespesaFixa
                   key={item.id}
                   item={item}
+                  mesAtual={mesAtual}
+                  override={overrides.find((o) => o.despesaFixaId === item.id) ?? null}
                   onMudarCategoria={(c) => mudarCategoriaDespesaFixa(item.id, c)}
                   onSalvarEdicao={(patch) => salvarEdicaoDespesaFixa(item.id, patch)}
                   onDesativar={() => desativarDespesaFixa(item)}
                   onRemover={() => removerDespesaFixa(item.id)}
+                  onSalvarOverride={(valorCents) => salvarOverride(item.id, valorCents)}
+                  onRemoverOverride={() => {
+                    const o = overrides.find((ov) => ov.despesaFixaId === item.id);
+                    if (o) removerOverride(o.id);
+                  }}
                 />
               ))}
             </>
@@ -348,7 +463,14 @@ function GrupoDeCompras({
   onMudarCategoria: (id: string, categoria: string | null) => void;
   onSalvarEdicao: (
     id: string,
-    patch: { nome: string; valorParcelaCents: number; parcelaAtual: number; parcelaTotal: number; continuaIndefinidamente: boolean },
+    patch: {
+      nome: string;
+      valorParcelaCents: number;
+      parcelaAtual: number;
+      parcelaTotal: number;
+      continuaIndefinidamente: boolean;
+      diaVencimento: number | null;
+    },
   ) => void;
   onRemover: (id: string) => void;
 }) {
@@ -397,15 +519,18 @@ function AdicionarDespesaFixa({ onAdded }: { onAdded: () => void }) {
   const [nome, setNome] = useState("");
   const [valor, setValor] = useState("");
   const [categoria, setCategoria] = useState<string | null>(null);
+  const [diaVencimento, setDiaVencimento] = useState("");
 
   async function adicionar(e: React.FormEvent) {
     e.preventDefault();
     const valorCents = Math.round(Number(valor.replace(",", ".")) * 100);
     if (!nome.trim() || !Number.isFinite(valorCents) || valorCents <= 0) return;
-    await despesasFixasApi.criar({ nome: nome.trim(), valorCents, categoria, ativo: true });
+    const dia = diaVencimento.trim() ? Math.min(Math.max(Number(diaVencimento), 1), 31) : null;
+    await despesasFixasApi.criar({ nome: nome.trim(), valorCents, categoria, ativo: true, diaVencimento: dia });
     setNome("");
     setValor("");
     setCategoria(null);
+    setDiaVencimento("");
     onAdded();
   }
 
@@ -421,6 +546,9 @@ function AdicionarDespesaFixa({ onAdded }: { onAdded: () => void }) {
         </Field>
         <Field label="Valor (R$)">
           <input placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} style={styles.inputMono} />
+        </Field>
+        <Field label="Dia venc.">
+          <input placeholder="ex: 10" value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} style={styles.inputMono} />
         </Field>
         <Field label="Categoria">
           <CategoriaSelect value={categoria} onChange={setCategoria} />
@@ -441,11 +569,13 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
   const [mesInicio, setMesInicio] = useState(mesAtual);
   const [categoria, setCategoria] = useState<string | null>(null);
   const [continuaIndefinidamente, setContinuaIndefinidamente] = useState(false);
+  const [diaVencimento, setDiaVencimento] = useState("");
 
   async function adicionar(e: React.FormEvent) {
     e.preventDefault();
     const valorParcelaCents = Math.round(Number(valor.replace(",", ".")) * 100);
     if (!nome.trim() || !Number.isFinite(valorParcelaCents) || valorParcelaCents <= 0) return;
+    const dia = diaVencimento.trim() ? Math.min(Math.max(Number(diaVencimento), 1), 31) : null;
 
     await parcelamentosApi.criar({
       nome: nome.trim(),
@@ -457,12 +587,14 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
       cartaoOrigem: null,
       categoria,
       continuaIndefinidamente,
+      diaVencimento: dia,
     });
     setNome("");
     setValor("");
     setParcelaAtual("1");
     setParcelaTotal("1");
     setCategoria(null);
+    setDiaVencimento("");
     setMesInicio(mesAtual);
     onAdded();
   }
@@ -495,7 +627,10 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
         </div>
         <div style={styles.formRow}>
           <Field label="Mês a que se refere a parcela atual">
-            <input type="month" value={mesInicio} onChange={(e) => setMesInicio(e.target.value)} style={{ ...styles.inputMono, width: "100%" }} />
+            <MesInput value={mesInicio} onChange={setMesInicio} />
+          </Field>
+          <Field label="Dia venc.">
+            <input placeholder="ex: 08" value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} style={styles.inputMono} />
           </Field>
         </div>
         <div style={{ ...styles.formRow, alignItems: "center" }}>

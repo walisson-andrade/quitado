@@ -1,5 +1,6 @@
 import type { DespesaFixa, MesReferencia } from "@quitado/shared-types";
 import { CATEGORIA_LABEL, categorizarAutomaticamente, type CategoriaSlug } from "./categoria.js";
+import { type DespesaFixaOverrideInput, valorDespesaFixaNoMes } from "./despesas.js";
 import {
   parcelamentoContaNoMes,
   type ParcelamentoComFatura,
@@ -35,6 +36,7 @@ export function totalPorCategoria(
   parcelamentosList: ParcelamentoComCategoria[],
   mesAtual: MesReferencia,
   ultimaFaturaPorOrigem: UltimaFaturaPorOrigem = {},
+  despesaFixaOverrides: DespesaFixaOverrideInput[] = [],
 ): CategoriaTotal[] {
   const buckets = new Map<string, CategoriaItemDetalhe[]>();
 
@@ -47,7 +49,7 @@ export function totalPorCategoria(
 
   for (const d of despesasFixas) {
     if (!d.ativo) continue;
-    acumular(d.nome, d.categoria, d.valorCents);
+    acumular(d.nome, d.categoria, valorDespesaFixaNoMes(d, mesAtual, despesaFixaOverrides));
   }
 
   for (const p of parcelamentosList) {

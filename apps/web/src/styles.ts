@@ -67,6 +67,7 @@ export const fontImports = `
     --q-euro-chip-bg: rgba(201, 155, 219, 0.1);
     --q-euro-chip-border: rgba(201, 155, 219, 0.3);
     --q-success-tint: rgba(127, 214, 194, 0.12);
+    --q-warning-tint: rgba(232, 135, 92, 0.14);
     --q-glow-1: rgba(127, 214, 194, 0.07);
     --q-glow-2: rgba(138, 168, 224, 0.06);
     --q-glow-3: rgba(201, 155, 219, 0.05);
@@ -110,6 +111,7 @@ export const fontImports = `
     --q-euro-chip-bg: rgba(131, 71, 173, 0.08);
     --q-euro-chip-border: rgba(131, 71, 173, 0.28);
     --q-success-tint: rgba(28, 143, 117, 0.12);
+    --q-warning-tint: rgba(193, 89, 31, 0.12);
     --q-glow-1: rgba(28, 143, 117, 0.06);
     --q-glow-2: rgba(63, 95, 168, 0.05);
     --q-glow-3: rgba(131, 71, 173, 0.05);
@@ -159,6 +161,10 @@ export const fontImports = `
   /* Barras dos gráficos: preenchem ao montar, puxando o olho pro dado novo. */
   @keyframes q-bar-fill { from { transform: scaleX(0); } }
   .q-bar-fill { transform-origin: left; animation: q-bar-fill 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+  /* Colunas mensais (Saldo projetado): cresce de baixo pra cima ao montar. */
+  @keyframes q-col-fill { from { transform: scaleY(0); } }
+  .q-col-fill { transform-origin: bottom; animation: q-col-fill 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
   /* Entrada em cascata dos cards de resumo no topo do Painel. */
   @keyframes q-rise-in {
@@ -259,14 +265,6 @@ export const styles: Record<string, CSSProperties> = {
   panelHeadRow: { display: "flex", flexDirection: "column", gap: 2, marginBottom: 12 },
   panelTitle: { fontFamily: "'Space Grotesk', sans-serif", fontSize: "var(--fs-title)", fontWeight: 600, margin: 0 },
   panelHint: { fontSize: "var(--fs-xs)", color: "var(--q-text-faint)" },
-  ganttWrap: { display: "flex", flexDirection: "column", gap: 10 },
-  ganttMonths: { display: "flex", justifyContent: "space-between", paddingLeft: 108, marginBottom: -2 },
-  ganttMonthLabel: { fontSize: "var(--fs-tiny)", color: "var(--q-text-faint-2)", fontFamily: "'JetBrains Mono', monospace" },
-  ganttRow: { display: "flex", alignItems: "center", gap: 8 },
-  ganttLabel: { width: 100, fontSize: "var(--fs-xs)", color: "var(--q-text-secondary)", flexShrink: 0 },
-  ganttTrack: { position: "relative", flex: 1, height: 10, background: "var(--q-track-bg)", borderRadius: 6 },
-  devedorBlock: { marginBottom: 18 },
-  devedorHead: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 },
   avatar: {
     width: 34,
     height: 34,
@@ -294,6 +292,119 @@ export const styles: Record<string, CSSProperties> = {
   },
   parcelaMes: { fontSize: "var(--fs-tiny)", color: "var(--q-text-tertiary)", fontFamily: "'JetBrains Mono', monospace" },
   parcelaValor: { fontSize: "var(--fs-sm)", fontFamily: "'JetBrains Mono', monospace" },
+
+  // --- Quem me deve: resumo, cards por pessoa e linha de adicionar compacta ---
+  devedoresSummaryRow: { display: "flex", gap: 10, marginBottom: 14 },
+  devedoresSummaryBox: {
+    flex: 1,
+    background: "var(--q-inset-bg)",
+    border: "1px solid var(--q-border)",
+    borderRadius: 12,
+    padding: "10px 12px",
+  },
+  devedoresSummaryLabel: { fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", marginBottom: 4 },
+  devedoresSummaryValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-title)", fontWeight: 600 },
+  devedorCard: {
+    background: "var(--q-inset-bg)",
+    border: "1px solid var(--q-border)",
+    borderRadius: 12,
+    padding: "12px 14px",
+    marginBottom: 10,
+  },
+  devedorCardHead: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
+    background: "none",
+    border: "none",
+    padding: 0,
+    color: "var(--q-text)",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  devedorPagoCount: { fontSize: "var(--fs-xs)", color: "var(--q-text-faint)", whiteSpace: "nowrap" },
+  chipMuted: {
+    display: "flex",
+    alignItems: "center",
+    padding: "6px 10px",
+    borderRadius: 10,
+    border: "1px dashed var(--q-border-input)",
+    fontSize: "var(--fs-sm)",
+    color: "var(--q-text-faint)",
+  },
+  maisParcelasBtn: {
+    marginTop: 8,
+    background: "none",
+    border: "none",
+    padding: 0,
+    fontSize: "var(--fs-xs)",
+    color: "var(--q-text-muted)",
+    cursor: "pointer",
+    textDecoration: "underline",
+  },
+  addPersonRow: { display: "flex", gap: 8, alignItems: "center", marginTop: 4 },
+
+  // --- Painel: card "Este mês" ---
+  esteMesRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "9px 0",
+    borderBottom: "1px solid var(--q-border)",
+    gap: 10,
+  },
+  esteMesValor: { fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-body)", color: "var(--q-orange)", whiteSpace: "nowrap" },
+  esteMesBtn: {
+    background: "var(--q-warning-tint)",
+    border: "1px solid var(--q-orange)",
+    borderRadius: 8,
+    padding: "5px 10px",
+    color: "var(--q-orange)",
+    fontFamily: "'Space Grotesk', sans-serif",
+    fontWeight: 600,
+    fontSize: "var(--fs-xs)",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+
+  // --- Contas a pagar: linha do tempo ---
+  timelineSummaryLabel: { fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", letterSpacing: 0.5, textTransform: "uppercase" },
+  timelineSummaryValor: { fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 600, lineHeight: 1.15 },
+  timelineSummaryPago: { fontSize: "var(--fs-sm)", color: "var(--q-teal)", marginTop: 4 },
+  timelineSegmentedBar: { display: "flex", gap: 3, marginTop: 12 },
+  timelineSegment: { flex: 1, height: 6, borderRadius: 3, background: "var(--q-track-bg)" },
+  timelineRow: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "10px 0",
+    borderBottom: "1px solid var(--q-border)",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    textAlign: "left",
+    color: "var(--q-text)",
+  },
+  timelineBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    flexShrink: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  timelineBadgeDia: { fontSize: 15, fontWeight: 700, lineHeight: 1.1 },
+  timelineBadgeMes: { fontSize: 8.5, letterSpacing: 0.5, opacity: 0.8, lineHeight: 1.3 },
+  timelineNome: { fontSize: "var(--fs-body)", fontWeight: 500 },
+  timelineStatus: { fontSize: "var(--fs-xs)", marginTop: 1 },
+  timelineValor: { fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-sm)", whiteSpace: "nowrap" },
+
   dropzone: {
     border: "1.5px dashed var(--q-dropzone-border)",
     borderRadius: 14,

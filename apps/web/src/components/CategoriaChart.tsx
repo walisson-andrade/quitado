@@ -20,6 +20,7 @@ export function CategoriaChart({ porCategoria }: { porCategoria: CategoriaTotal[
   return (
     <BarBreakdownList
       vazio="Sem despesas categorizadas ainda."
+      mostrarMarcadorFim
       itens={porCategoria.map((c) => ({
         key: c.categoria,
         label: c.label,

@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { desc, eq, and, ne } from "drizzle-orm";
+import { desc, eq, and, ne, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { ConfirmarFaturaRequestSchema, ItemFaturaStagedArraySchema } from "@quitado/shared-types";
 import type { Db } from "../db/client.js";
-import { faturasImportadas, parcelamentos } from "../db/schema.js";
+import { cartoes, faturasImportadas, parcelamentos } from "../db/schema.js";
 import { parseNubankCsv } from "../import/csv/parseNubankCsv.js";
 import { extractFromDocument } from "../import/gemini/extractFromDocument.js";
 import { parseGeminiResponse } from "../import/gemini/parseGeminiResponse.js";
@@ -89,13 +89,30 @@ export const criarFaturaUpload: Handler = async ({ db, body }) => {
 
   let itens;
   let mesReferenciaSugerido: string | null = null;
+  let titularSugerido: string | null = null;
+  let bancoSugerido: string | null = null;
+  let totalFaturaSugeridoCents: number | null = null;
   if (input.tipoOrigem === "csv_nubank") {
     itens = normalizeItensFatura(parseNubankCsv(buffer.toString("utf-8")));
+    bancoSugerido = "Nubank"; // caminho CSV é só pro extrato do Nubank, sem ambiguidade.
   } else {
-    const extracao = await extractFromDocument(buffer, input.mimeType);
+    let extracao;
+    try {
+      extracao = await extractFromDocument(buffer, input.mimeType);
+    } catch (err) {
+      // Causa mais comum de falha aqui é PDF protegido por senha (a IA não
+      // consegue abrir) — mensagem clara em vez do 500 genérico.
+      throw new HttpError(
+        422,
+        "Não consegui ler esse arquivo. Se for um PDF protegido por senha, remova a senha (ex: abra e salve uma cópia sem senha) e tente importar de novo.",
+      );
+    }
     const parseado = parseGeminiResponse(extracao);
     itens = normalizeItensFatura(parseado.itensValidos);
     mesReferenciaSugerido = parseado.mesReferenciaSugerido;
+    titularSugerido = parseado.titularSugerido;
+    bancoSugerido = parseado.bancoSugerido;
+    totalFaturaSugeridoCents = parseado.totalFaturaSugeridoCents;
   }
 
   const [row] = await db
@@ -106,6 +123,9 @@ export const criarFaturaUpload: Handler = async ({ db, body }) => {
       arquivoStorageKey: storageKey,
       arquivoHash,
       mesReferenciaSugerido,
+      titularSugerido,
+      bancoSugerido,
+      totalFaturaSugeridoCents,
       jsonExtraido: itens,
       status: "pendente_revisao",
     })
@@ -116,69 +136,90 @@ export const criarFaturaUpload: Handler = async ({ db, body }) => {
 
 export const confirmarFatura: Handler = async ({ db, body }) => {
   const input = ConfirmarFaturaRequestSchema.parse(body);
-  const [fatura] = await db.select().from(faturasImportadas).where(eq(faturasImportadas.id, input.faturaId)).limit(1);
-  if (!fatura) throw new HttpError(404, "Fatura não encontrada");
-  if (fatura.status === "confirmado") {
-    throw new HttpError(409, "Esta fatura já foi confirmada — evita duplicar os parcelamentos.");
-  }
 
-  // Banco real (Inter/Nubank/outro) informado na revisão tem prioridade —
-  // o método de extração (origemImportacao: pdf_imagem_ia vs csv_nubank) não
-  // é confiável pra decidir o banco, já que qualquer banco pode mandar PDF ou CSV.
-  const origemPadrao = (item: (typeof input.itensAprovados)[number]) =>
-    input.origemFatura ?? (item.origemImportacao === "csv_nubank" ? "Nubank" : "Inter");
+  return db.transaction(async (tx) => {
+    const [fatura] = await tx.select().from(faturasImportadas).where(eq(faturasImportadas.id, input.faturaId)).limit(1);
+    if (!fatura) throw new HttpError(404, "Fatura não encontrada");
+    if (fatura.status === "confirmado") {
+      throw new HttpError(409, "Esta fatura já foi confirmada — evita duplicar os parcelamentos.");
+    }
 
-  const candidatos = input.itensAprovados
-    .filter((item) => item.tipo === "despesa")
-    .map((item) => ({
-      nome: item.nome,
-      valorParcelaCents: item.valorCents,
-      parcelaAtual: item.parcelaAtual ?? 1,
-      parcelaTotal: item.parcelaTotal ?? 1,
-      mesInicio: item.mesInicio ?? item.data.slice(0, 7),
-      origem: origemPadrao(item),
-      cartaoOrigem: item.cartaoOrigem,
-      continuaIndefinidamente: false,
-      faturaImportadaId: fatura.id,
-    }));
+    // Banco real (Inter/Nubank/outro) informado na revisão tem prioridade —
+    // o método de extração (origemImportacao: pdf_imagem_ia vs csv_nubank) não
+    // é confiável pra decidir o banco, já que qualquer banco pode mandar PDF ou CSV.
+    const origemFinal = input.origemFatura ?? (fatura.tipoOrigem === "csv_nubank" ? "Nubank" : "Inter");
+    const origemPadrao = (item: (typeof input.itensAprovados)[number]) =>
+      input.origemFatura ?? (item.origemImportacao === "csv_nubank" ? "Nubank" : "Inter");
 
-  // Dedup por nome + valor + parcela atual/total: a mesma cobrança pode
-  // aparecer em faturas diferentes (ex: reimportação, ou dois arquivos que
-  // se sobrepõem) — não duplica um parcelamento que já existe com essa
-  // combinação exata, mesmo vindo de um upload novo.
-  const existentes = await db
-    .select({
-      nome: parcelamentos.nome,
-      valorParcelaCents: parcelamentos.valorParcelaCents,
-      parcelaAtual: parcelamentos.parcelaAtual,
-      parcelaTotal: parcelamentos.parcelaTotal,
-    })
-    .from(parcelamentos);
-  const chaveExistentes = new Set(
-    existentes.map((p) => `${p.nome}|${p.valorParcelaCents}|${p.parcelaAtual}|${p.parcelaTotal}`),
-  );
+    // A fatura do mês relista TODO lançamento ainda em aberto daquele
+    // cartão, não só os novos — a compra parcelada "3 de 10" de julho
+    // reaparece em agosto como "4 de 10". Sem isso, as duas linhas ficariam
+    // ativas ao mesmo tempo por contagem de calendário e contariam em dobro
+    // nos meses futuros da projeção assim que o mês virasse. Por isso, toda
+    // fatura confirmada substitui por completo os parcelamentos de faturas
+    // ANTERIORES do mesmo cartão (nunca mexe em Custos Fixos/itens manuais).
+    await tx.delete(parcelamentos).where(and(eq(parcelamentos.origem, origemFinal), isNotNull(parcelamentos.faturaImportadaId)));
 
-  const parcelamentosParaInserir = candidatos.filter(
-    (c) => !chaveExistentes.has(`${c.nome}|${c.valorParcelaCents}|${c.parcelaAtual}|${c.parcelaTotal}`),
-  );
-  const duplicadosIgnorados = candidatos.length - parcelamentosParaInserir.length;
+    const candidatos = input.itensAprovados
+      .filter((item) => item.tipo === "despesa")
+      .map((item) => ({
+        nome: item.nome,
+        valorParcelaCents: item.valorCents,
+        parcelaAtual: item.parcelaAtual ?? 1,
+        parcelaTotal: item.parcelaTotal ?? 1,
+        mesInicio: item.mesInicio ?? item.data.slice(0, 7),
+        origem: origemPadrao(item),
+        cartaoOrigem: item.cartaoOrigem,
+        continuaIndefinidamente: false,
+        faturaImportadaId: fatura.id,
+      }));
 
-  if (parcelamentosParaInserir.length > 0) {
-    await db.insert(parcelamentos).values(parcelamentosParaInserir);
-  }
+    // Dedup por nome + valor + parcela atual/total: guarda-chuva pra não
+    // duplicar se a mesma fatura for confirmada mais de uma vez ou se dois
+    // arquivos se sobrepuserem — roda depois do delete acima, então só pega
+    // duplicata real (não as linhas antigas que acabaram de sair).
+    const existentes = await tx
+      .select({
+        nome: parcelamentos.nome,
+        valorParcelaCents: parcelamentos.valorParcelaCents,
+        parcelaAtual: parcelamentos.parcelaAtual,
+        parcelaTotal: parcelamentos.parcelaTotal,
+      })
+      .from(parcelamentos);
+    const chaveExistentes = new Set(
+      existentes.map((p) => `${p.nome}|${p.valorParcelaCents}|${p.parcelaAtual}|${p.parcelaTotal}`),
+    );
 
-  const [atualizada] = await db
-    .update(faturasImportadas)
-    .set({
-      status: "confirmado",
-      origem: input.origemFatura ?? (fatura.tipoOrigem === "csv_nubank" ? "Nubank" : "Inter"),
-      jsonConfirmado: ItemFaturaStagedArraySchema.parse(input.itensAprovados),
-      confirmadoEm: new Date(),
-    })
-    .where(eq(faturasImportadas.id, input.faturaId))
-    .returning();
+    const parcelamentosParaInserir = candidatos.filter(
+      (c) => !chaveExistentes.has(`${c.nome}|${c.valorParcelaCents}|${c.parcelaAtual}|${c.parcelaTotal}`),
+    );
+    const duplicadosIgnorados = candidatos.length - parcelamentosParaInserir.length;
 
-  return { status: 200, body: { ...atualizada, itensInseridos: parcelamentosParaInserir.length, duplicadosIgnorados } };
+    if (parcelamentosParaInserir.length > 0) {
+      await tx.insert(parcelamentos).values(parcelamentosParaInserir);
+    }
+
+    // Cartão nasce sozinho na primeira fatura confirmada com esse nome de
+    // origem — o usuário só precisa entrar no Config pra configurar o dia de
+    // vencimento, não pra cadastrar o cartão em si.
+    const [cartaoExistente] = await tx.select({ id: cartoes.id }).from(cartoes).where(eq(cartoes.nome, origemFinal)).limit(1);
+    if (!cartaoExistente) {
+      await tx.insert(cartoes).values({ nome: origemFinal });
+    }
+
+    const [atualizada] = await tx
+      .update(faturasImportadas)
+      .set({
+        status: "confirmado",
+        origem: origemFinal,
+        jsonConfirmado: ItemFaturaStagedArraySchema.parse(input.itensAprovados),
+        confirmadoEm: new Date(),
+      })
+      .where(eq(faturasImportadas.id, input.faturaId))
+      .returning();
+
+    return { status: 200, body: { ...atualizada, itensInseridos: parcelamentosParaInserir.length, duplicadosIgnorados } };
+  });
 };
 
 export const descartarFatura: Handler<unknown, { id: string }> = async ({ db, params }) => {
@@ -189,6 +230,24 @@ export const descartarFatura: Handler<unknown, { id: string }> = async ({ db, pa
     .returning();
   if (!row) throw new HttpError(404, "Fatura não encontrada");
   return { status: 200, body: row };
+};
+
+/**
+ * Remove uma fatura importada da lista. Se já tinha sido confirmada, os
+ * parcelamentos que ela gerou saem junto (senão ficariam órfãos, contando
+ * pra sempre num cartão que "não existe mais" do ponto de vista do usuário)
+ * — mas nunca mexe em Custos Fixos ou parcelamentos manuais.
+ */
+export const removerFaturaImportada: Handler<unknown, { id: string }> = async ({ db, params }) => {
+  return db.transaction(async (tx) => {
+    const [fatura] = await tx.select().from(faturasImportadas).where(eq(faturasImportadas.id, params.id)).limit(1);
+    if (!fatura) throw new HttpError(404, "Fatura não encontrada");
+
+    await tx.delete(parcelamentos).where(eq(parcelamentos.faturaImportadaId, fatura.id));
+    await tx.delete(faturasImportadas).where(eq(faturasImportadas.id, fatura.id));
+
+    return { status: 204, body: null };
+  });
 };
 
 export const obterArquivoFatura: Handler<unknown, { id: string }> = async ({ db, params }) => {

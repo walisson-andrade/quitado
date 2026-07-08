@@ -9,13 +9,15 @@ export function GrupoExpansivel({
   quantidadeItens,
   corAccent,
   abertoPorPadrao,
+  renderHeader,
   children,
 }: {
-  titulo: string;
-  totalCents: number;
-  quantidadeItens: number;
+  titulo?: string;
+  totalCents?: number;
+  quantidadeItens?: number;
   corAccent: string;
   abertoPorPadrao?: boolean;
+  renderHeader?: (aberto: boolean) => React.ReactNode;
   children: React.ReactNode;
 }) {
   const [aberto, setAberto] = useState(abertoPorPadrao ?? false);
@@ -38,14 +40,20 @@ export function GrupoExpansivel({
           textAlign: "left",
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={16} color={corAccent} />
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)" }}>
-            {titulo}
-          </span>
-          <span style={styles.panelHint}>({quantidadeItens} {quantidadeItens === 1 ? "item" : "itens"})</span>
-        </span>
-        <span style={{ ...styles.parcelaValor, color: corAccent, fontSize: "var(--fs-body)" }}>{fmt(totalCents)}</span>
+        {renderHeader ? (
+          renderHeader(aberto)
+        ) : (
+          <>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={16} color={corAccent} />
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)" }}>
+                {titulo}
+              </span>
+              <span style={styles.panelHint}>({quantidadeItens} {quantidadeItens === 1 ? "item" : "itens"})</span>
+            </span>
+            <span style={{ ...styles.parcelaValor, color: corAccent, fontSize: "var(--fs-body)" }}>{fmt(totalCents ?? 0)}</span>
+          </>
+        )}
       </button>
       <div className={`q-expand${aberto ? " aberto" : ""}`}>
         <div style={{ padding: aberto ? "10px 14px 14px" : "0 14px" }}>{children}</div>

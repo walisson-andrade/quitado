@@ -2,16 +2,57 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Sparkles, Trash2, Upload } from "lucide-react";
 import { CATEGORIA_LABEL, categorizarAutomaticamente, resolverMesAtual } from "@quitado/calc";
 import type { ItemFaturaStaged } from "@quitado/shared-types";
-import { faturasApi } from "../api/resources.js";
+import { cartoesApi, faturasApi } from "../api/resources.js";
 import { ApiError } from "../api/client.js";
-import type { FaturaImportadaRow } from "../api/types.js";
+import type { CartaoRow, FaturaImportadaRow } from "../api/types.js";
 import { Field } from "../components/Field.js";
+import { MesInput } from "../components/MesInput.js";
 import { fmt } from "../format.js";
 import { styles } from "../styles.js";
 
 type ItemRevisao = ItemFaturaStaged & { incluido: boolean };
 
 const optionStyle = { background: "var(--q-card-bg)", color: "var(--q-text)" };
+
+/**
+ * Muitas faturas mostram, além da cobrança deste mês, uma tabela de PRÉVIA
+ * das próximas parcelas de uma compra já parcelada — mesmo nome + mesma data
+ * de compra original, só variando o número da parcela. Isso não é confiável
+ * pedir pra IA simplesmente "não extrair" (ela erra), então detecta aqui de
+ * forma determinística: se existe outro item com nome+data iguais e parcela
+ * MENOR, este aqui é quase certamente uma prévia futura, não uma cobrança
+ * nova — não decide sozinho (não some da lista), só começa desmarcado com um
+ * aviso, e o usuário pode marcar de volta se estiver errado.
+ */
+function ehProvavelParcelaFutura(itens: ItemFaturaStaged[], item: ItemFaturaStaged): boolean {
+  if (item.parcelaAtual == null || item.parcelaTotal == null) return false;
+  return itens.some(
+    (outro) =>
+      outro !== item &&
+      outro.nome === item.nome &&
+      outro.data === item.data &&
+      outro.parcelaAtual != null &&
+      outro.parcelaAtual < item.parcelaAtual!,
+  );
+}
+
+/**
+ * Quando uma compra parcelada é cancelada, a fatura mostra uma linha de
+ * estorno separada com o MESMO nome da loja e a MESMA quantidade total de
+ * parcelas — a compra inteira caiu, então todas as parcelas "despesa" dessa
+ * compra não deviam contar mais. Casar só pelo nome não é seguro: a mesma
+ * loja pode aparecer várias vezes na fatura como compras diferentes e sem
+ * relação (ex: "AMAZON BR SA" à vista em dias distintos) — por isso também
+ * exige bater a quantidade de parcelas, pra não apagar compra errada. Mesma
+ * lógica da prévia futura: nunca decide sozinho, só começa desmarcado com um
+ * aviso, o usuário confere e pode marcar de volta se for engano.
+ */
+function ehCanceladoPorEstorno(itens: ItemFaturaStaged[], item: ItemFaturaStaged): boolean {
+  if (item.tipo !== "despesa") return false;
+  return itens.some(
+    (outro) => outro.tipo === "estorno" && outro.nome === item.nome && outro.parcelaTotal === item.parcelaTotal,
+  );
+}
 
 function tipoOrigemPorArquivo(nome: string): "pdf_imagem_ia" | "csv_nubank" {
   return nome.toLowerCase().endsWith(".csv") ? "csv_nubank" : "pdf_imagem_ia";
@@ -29,6 +70,46 @@ function detectarOrigemPorArquivo(nome: string): "Inter" | "Nubank" | "" {
   return "";
 }
 
+/**
+ * Sugere qual cartão já cadastrado bate com esta fatura, cruzando o banco
+ * (lido pela IA no documento, ou como fallback adivinhado pelo nome do
+ * arquivo) com o titular lido pela IA — ex: banco "Santander" + titular
+ * "Leticia Mendes" bate com o cartão "Santander Leticia".
+ *
+ * O banco é um FILTRO, não só mais um ponto de pontuação: uma pessoa pode
+ * ter cartão em vários bancos (ex: Walisson tem Inter, Nubank e Santander),
+ * então bater o nome dela sozinho não é suficiente — já causou bug real
+ * (fatura do Inter sendo sugerida como "Nubank Walisson" só porque batia o
+ * titular). Nunca decide sozinho: é só o valor pré-selecionado no dropdown,
+ * o usuário sempre confere/troca antes de confirmar.
+ */
+function sugerirCartao(
+  cartoes: CartaoRow[],
+  nomeArquivo: string,
+  titularSugerido: string | null,
+  bancoSugerido: string | null,
+): string | null {
+  const bancoGuess = (bancoSugerido || detectarOrigemPorArquivo(nomeArquivo)).toLowerCase();
+  const primeiroNomeTitular = titularSugerido?.trim().split(/\s+/)[0]?.toLowerCase();
+
+  // Sem pista de banco nenhuma, não tem base segura pra restringir — considera todos.
+  const candidatos = bancoGuess ? cartoes.filter((c) => c.nome.toLowerCase().includes(bancoGuess)) : cartoes;
+
+  if (primeiroNomeTitular) {
+    const comTitular = candidatos.find((c) => c.nome.toLowerCase().includes(primeiroNomeTitular));
+    if (comTitular) return comTitular.nome;
+  }
+
+  // Só um cartão bate com o banco (sem distinção de pessoa) — usa ele.
+  if (candidatos.length === 1) return candidatos[0]!.nome;
+
+  // Mais de um cartão do mesmo banco e nenhum bate o titular — prefere o
+  // nome "genérico" (só o banco, sem sufixo de pessoa) se existir; senão
+  // não arrisca escolher entre pessoas diferentes, deixa em branco.
+  const generico = bancoGuess ? candidatos.find((c) => c.nome.toLowerCase() === bancoGuess) : null;
+  return generico ? generico.nome : null;
+}
+
 function lerComoBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -38,24 +119,57 @@ function lerComoBase64(file: File): Promise<string> {
   });
 }
 
+const NOVO_CARTAO = "__novo__";
+
 export function Fatura() {
   const [estado, setEstado] = useState<"idle" | "enviando" | "erro">("idle");
   const [erro, setErro] = useState<string | null>(null);
   const [faturaAtual, setFaturaAtual] = useState<FaturaImportadaRow | null>(null);
   const [itens, setItens] = useState<ItemRevisao[]>([]);
   const [mesReferenciaFatura, setMesReferenciaFatura] = useState(resolverMesAtual(null));
-  const [origemFatura, setOrigemFatura] = useState<"Inter" | "Nubank" | "outro">("Inter");
+  const [cartoes, setCartoes] = useState<CartaoRow[]>([]);
+  const [origemSelecionada, setOrigemSelecionada] = useState<string>("Inter");
+  const [origemSugerida, setOrigemSugerida] = useState<string | null>(null);
   const [origemFaturaCustom, setOrigemFaturaCustom] = useState("");
   const [confirmando, setConfirmando] = useState(false);
   const [resultadoConfirmacao, setResultadoConfirmacao] = useState<string | null>(null);
   const [pendentes, setPendentes] = useState<FaturaImportadaRow[]>([]);
+  const [todasFaturas, setTodasFaturas] = useState<FaturaImportadaRow[]>([]);
+  const [confirmarRemocaoId, setConfirmarRemocaoId] = useState<string | null>(null);
+  const [removendoId, setRemovendoId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function carregarPendentes() {
-    faturasApi.listar().then((rows) => setPendentes(rows.filter((r) => r.status === "pendente_revisao")));
+    faturasApi.listar().then((rows) => {
+      setPendentes(rows.filter((r) => r.status === "pendente_revisao"));
+      setTodasFaturas(rows);
+    });
   }
 
-  useEffect(carregarPendentes, []);
+  async function removerFatura(id: string) {
+    setRemovendoId(id);
+    try {
+      await faturasApi.remover(id);
+      setConfirmarRemocaoId(null);
+      carregarPendentes();
+    } finally {
+      setRemovendoId(null);
+    }
+  }
+
+  const STATUS_LABEL: Record<FaturaImportadaRow["status"], string> = {
+    processando: "processando",
+    pendente_revisao: "pendente de revisão",
+    confirmado: "confirmada",
+    descartado: "descartada",
+  };
+
+  useEffect(() => {
+    carregarPendentes();
+    cartoesApi.listar().then(setCartoes);
+  }, []);
+
+  const opcoesCartao = Array.from(new Set(["Inter", "Nubank", ...cartoes.map((c) => c.nome)])).sort();
 
   async function handleFile(file: File) {
     setEstado("enviando");
@@ -78,11 +192,24 @@ export function Fatura() {
 
   function abrirRevisao(fatura: FaturaImportadaRow) {
     setFaturaAtual(fatura);
-    setItens(fatura.jsonExtraido.map((item) => ({ ...item, incluido: item.tipo === "despesa" })));
+    setItens(
+      fatura.jsonExtraido.map((item) => ({
+        ...item,
+        incluido:
+          item.tipo === "despesa" &&
+          !ehProvavelParcelaFutura(fatura.jsonExtraido, item) &&
+          !ehCanceladoPorEstorno(fatura.jsonExtraido, item),
+      })),
+    );
     setMesReferenciaFatura(fatura.mesReferenciaSugerido ?? resolverMesAtual(null));
     setResultadoConfirmacao(null);
-    const detectado = detectarOrigemPorArquivo(fatura.nomeArquivo);
-    setOrigemFatura(detectado || "Inter");
+    const sugestao = sugerirCartao(cartoes, fatura.nomeArquivo, fatura.titularSugerido, fatura.bancoSugerido);
+    const banco = fatura.bancoSugerido || detectarOrigemPorArquivo(fatura.nomeArquivo);
+    setOrigemSugerida(sugestao);
+    // Sem sugestão de cartão nem pista de banco (IA ou nome do arquivo), não
+    // chuta "Inter" por padrão (erraria silenciosamente pra qualquer banco
+    // novo, ex: Santander) — força escolher/cadastrar o cartão certo.
+    setOrigemSelecionada(sugestao ?? (banco || NOVO_CARTAO));
     setOrigemFaturaCustom("");
   }
 
@@ -105,7 +232,7 @@ export function Fatura() {
 
   async function confirmar() {
     if (!faturaAtual || confirmando) return;
-    const origemFaturaFinal = origemFatura === "outro" ? origemFaturaCustom.trim() : origemFatura;
+    const origemFaturaFinal = origemSelecionada === NOVO_CARTAO ? origemFaturaCustom.trim() : origemSelecionada;
     if (!origemFaturaFinal) return;
     setConfirmando(true);
     try {
@@ -142,6 +269,17 @@ export function Fatura() {
   }
 
   if (faturaAtual) {
+    const totalIncluido = itens.filter((i) => i.incluido).reduce((acc, i) => acc + i.valorCents, 0);
+    const totalTodos = itens.reduce((acc, i) => acc + i.valorCents, 0);
+    const totalReal = faturaAtual.totalFaturaSugeridoCents;
+    // Compara contra os itens MARCADOS (o que de fato vai ser salvo) — não
+    // contra a soma de tudo, que sempre vai incluir itens corretamente
+    // desmarcados (pagamento da fatura, prováveis parcelas futuras) e por
+    // isso quase nunca bateria mesmo quando a seleção já está certa.
+    // Pequena tolerância de arredondamento — diferença de verdade (item
+    // faltando/sobrando ou tabela de parcelas futuras duplicada) é bem maior que isso.
+    const bateComOTotal = totalReal == null || Math.abs(totalIncluido - totalReal) <= 5;
+
     return (
       <section className="q-surface" style={styles.panel}>
         <div style={styles.panelHeadRow}>
@@ -151,37 +289,71 @@ export function Fatura() {
           </span>
         </div>
 
+        <div
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderRadius: 12,
+            background: bateComOTotal ? "var(--q-inset-bg)" : "var(--q-warning-tint)",
+            border: `1px solid ${bateComOTotal ? "var(--q-border)" : "var(--q-orange)"}`,
+          }}
+        >
+          <div style={styles.timelineSummaryLabel}>total desta fatura (itens marcados)</div>
+          <div style={{ ...styles.timelineSummaryValor, fontSize: 22, color: "var(--q-orange)" }}>{fmt(totalIncluido)}</div>
+          {totalIncluido !== totalTodos && (
+            <div style={styles.uploadNote}>{fmt(totalTodos)} somando os {itens.length} itens lidos, antes de desmarcar algum.</div>
+          )}
+          {totalReal != null ? (
+            <div style={{ ...styles.uploadNote, color: bateComOTotal ? "var(--q-teal)" : "var(--q-orange)", fontWeight: 600, marginTop: 6 }}>
+              {bateComOTotal
+                ? `Bate com o total impresso na fatura (${fmt(totalReal)}).`
+                : `Não bate com o total impresso na fatura: ${fmt(totalReal)}. Provavelmente sobrou algum item de uma tabela de parcelas futuras (não cobradas neste mês) — confira a lista abaixo antes de confirmar.`}
+            </div>
+          ) : (
+            <div style={styles.uploadNote}>Não consegui ler o total impresso nesta fatura — confere esse valor contra o extrato real antes de confirmar.</div>
+          )}
+        </div>
+
         <div style={{ marginBottom: 14 }}>
-          <Field label="Banco de origem">
+          <Field label="Cartão / banco de origem">
             <select
-              value={origemFatura}
-              onChange={(e) => setOrigemFatura(e.target.value as "Inter" | "Nubank" | "outro")}
+              value={origemSelecionada}
+              onChange={(e) => setOrigemSelecionada(e.target.value)}
               style={{ ...styles.input, width: "100%" }}
             >
-              <option value="Inter" style={optionStyle}>Inter</option>
-              <option value="Nubank" style={optionStyle}>Nubank</option>
-              <option value="outro" style={optionStyle}>Outro...</option>
+              {opcoesCartao.map((nome) => (
+                <option key={nome} value={nome} style={optionStyle}>
+                  {nome}
+                </option>
+              ))}
+              <option value={NOVO_CARTAO} style={optionStyle}>
+                + Novo cartão...
+              </option>
             </select>
           </Field>
-          {origemFatura === "outro" && (
+          {origemSelecionada === NOVO_CARTAO && (
             <input
-              placeholder="Nome do banco/cartão"
+              placeholder="Nome do banco/cartão (ex: Santander Leticia)"
               value={origemFaturaCustom}
               onChange={(e) => setOrigemFaturaCustom(e.target.value)}
               style={{ ...styles.input, width: "100%", marginTop: 8 }}
             />
+          )}
+          {(faturaAtual.titularSugerido || faturaAtual.bancoSugerido) && (
+            <div style={{ ...styles.uploadNote, marginTop: 8 }}>
+              IA leu {faturaAtual.bancoSugerido ? `banco "${faturaAtual.bancoSugerido}"` : "o documento"}
+              {faturaAtual.titularSugerido ? ` e titular "${faturaAtual.titularSugerido}"` : ""} —{" "}
+              {origemSugerida
+                ? `já selecionou "${origemSugerida}", confira se bate.`
+                : "não achei um cartão cadastrado que bata com segurança — escolha ou cadastre um novo."}
+            </div>
           )}
         </div>
 
         {precisaMesReferencia && (
           <div style={{ marginBottom: 14 }}>
             <Field label="Mês desta fatura (data de vencimento)">
-              <input
-                type="month"
-                value={mesReferenciaFatura}
-                onChange={(e) => setMesReferenciaFatura(e.target.value)}
-                style={{ ...styles.inputMono, width: "100%" }}
-              />
+              <MesInput value={mesReferenciaFatura} onChange={setMesReferenciaFatura} />
             </Field>
             <div style={{ ...styles.uploadNote, marginTop: 8 }}>
               {faturaAtual.mesReferenciaSugerido
@@ -213,12 +385,60 @@ export function Fatura() {
                 <Trash2 size={14} color="var(--q-orange)" />
               </button>
             </div>
-            <div style={{ display: "flex", gap: 8, paddingLeft: 24 }}>
+            <div style={{ display: "flex", gap: 8, paddingLeft: 24, alignItems: "center" }}>
               <span style={styles.panelHint}>{item.data}</span>
-              <span style={styles.panelHint}>· {item.tipo}</span>
+              {item.tipo === "despesa" ? (
+                <span style={styles.panelHint}>· despesa</span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: "var(--fs-tiny)",
+                    fontWeight: 700,
+                    color: item.tipo === "estorno" ? "var(--q-orange)" : "var(--q-purple)",
+                    border: `1px solid ${item.tipo === "estorno" ? "var(--q-orange)" : "var(--q-purple)"}`,
+                    borderRadius: 6,
+                    padding: "1px 5px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {item.tipo === "estorno" ? "estorno" : "pagamento da fatura"}
+                </span>
+              )}
               {item.parcelaAtual && item.parcelaTotal && (
                 <span style={styles.panelHint}>
                   · parcela {item.parcelaAtual}/{item.parcelaTotal}
+                </span>
+              )}
+              {ehProvavelParcelaFutura(itens, item) && (
+                <span
+                  style={{
+                    fontSize: "var(--fs-tiny)",
+                    fontWeight: 700,
+                    color: "var(--q-gold)",
+                    border: "1px solid var(--q-gold)",
+                    borderRadius: 6,
+                    padding: "1px 5px",
+                    textTransform: "uppercase",
+                  }}
+                  title="Já tem outra parcela dessa mesma compra com número menor — provável prévia de parcela futura, não cobrada nesta fatura"
+                >
+                  provável parcela futura
+                </span>
+              )}
+              {ehCanceladoPorEstorno(itens, item) && (
+                <span
+                  style={{
+                    fontSize: "var(--fs-tiny)",
+                    fontWeight: 700,
+                    color: "var(--q-orange)",
+                    border: "1px solid var(--q-orange)",
+                    borderRadius: 6,
+                    padding: "1px 5px",
+                    textTransform: "uppercase",
+                  }}
+                  title="Tem um estorno com esse mesmo nome nesta fatura — a compra provavelmente foi cancelada"
+                >
+                  cancelado (tem estorno)
                 </span>
               )}
               {item.cartaoOrigem && <span style={styles.panelHint}>· {item.cartaoOrigem}</span>}
@@ -236,10 +456,10 @@ export function Fatura() {
             style={{
               ...styles.button,
               flex: 1,
-              opacity: confirmando || (origemFatura === "outro" && !origemFaturaCustom.trim()) ? 0.6 : 1,
+              opacity: confirmando || (origemSelecionada === NOVO_CARTAO && !origemFaturaCustom.trim()) ? 0.6 : 1,
             }}
             onClick={confirmar}
-            disabled={confirmando || (origemFatura === "outro" && !origemFaturaCustom.trim())}
+            disabled={confirmando || (origemSelecionada === NOVO_CARTAO && !origemFaturaCustom.trim())}
           >
             {confirmando ? "Salvando..." : `Confirmar ${itens.filter((i) => i.incluido).length} itens`}
           </button>
@@ -307,6 +527,62 @@ export function Fatura() {
               <span>{f.nomeArquivo}</span>
               <Check size={14} color="var(--q-text-muted)" />
             </button>
+          ))}
+        </div>
+      )}
+
+      {todasFaturas.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={styles.panelHint}>Faturas importadas</div>
+          {todasFaturas.map((f) => (
+            <div key={f.id} style={{ ...styles.listRow, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <div style={styles.listRowMain}>
+                  <span>{f.nomeArquivo}</span>
+                  <span style={styles.panelHint}>
+                    {f.origem ?? "sem origem"} · {STATUS_LABEL[f.status]}
+                  </span>
+                </div>
+                {confirmarRemocaoId !== f.id && (
+                  <button
+                    className="q-btn"
+                    style={{ ...styles.buttonGhost, padding: 8 }}
+                    onClick={() => setConfirmarRemocaoId(f.id)}
+                    aria-label="Excluir fatura"
+                    title="Excluir fatura"
+                  >
+                    <Trash2 size={14} color="var(--q-orange)" />
+                  </button>
+                )}
+              </div>
+              {confirmarRemocaoId === f.id && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={styles.errorText}>
+                    {f.status === "confirmado"
+                      ? "Excluir também remove as despesas que essa fatura gerou. Tem certeza?"
+                      : "Tem certeza que quer excluir essa fatura?"}
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="q-btn"
+                      style={{ ...styles.buttonGhost, flex: 1 }}
+                      onClick={() => setConfirmarRemocaoId(null)}
+                      disabled={removendoId === f.id}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="q-btn"
+                      style={{ ...styles.button, flex: 1, background: "var(--q-orange)" }}
+                      onClick={() => removerFatura(f.id)}
+                      disabled={removendoId === f.id}
+                    >
+                      {removendoId === f.id ? "Excluindo..." : "Confirmar exclusão"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}

@@ -38,6 +38,12 @@ export const FaturaImportadaSchema = z.object({
   nomeArquivo: z.string(),
   arquivoStorageKey: z.string().nullable(),
   mesReferenciaSugerido: MesReferenciaSchema.nullable(),
+  /** Nome do titular do cartão lido no documento pela IA — sugestão pra bater com um cartão já cadastrado, o usuário sempre confirma. */
+  titularSugerido: z.string().nullable(),
+  /** Nome do banco/emissor lido no documento pela IA — mais confiável que adivinhar pelo nome do arquivo. */
+  bancoSugerido: z.string().nullable(),
+  /** Total da fatura impresso no documento, lido pela IA (centavos) — só pra conferir contra a soma dos itens na revisão. */
+  totalFaturaSugeridoCents: z.number().int().nullable(),
   jsonExtraido: ItemFaturaStagedArraySchema,
   jsonConfirmado: ItemFaturaStagedArraySchema.nullable(),
   status: FaturaStatusSchema,

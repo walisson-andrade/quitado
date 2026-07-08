@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, Moon, Settings, Sun, Target, Upload, Users, Wallet,
+  CalendarClock, LayoutDashboard, Moon, Settings, Sun, Target, Upload, Users, Wallet,
 } from "lucide-react";
 import { configApi } from "./api/resources.js";
 import { NavBtn } from "./components/NavBtn.js";
 import { Configuracoes } from "./pages/Configuracoes.js";
+import { ContasAPagar } from "./pages/ContasAPagar.js";
 import { Dashboard } from "./pages/Dashboard.js";
 import { Despesas } from "./pages/Despesas.js";
 import { Fatura } from "./pages/Fatura.js";
@@ -14,7 +15,7 @@ import { QuemMeDeve } from "./pages/QuemMeDeve.js";
 import { fontImports, styles } from "./styles.js";
 import { useTheme } from "./useTheme.js";
 
-type Tab = "dashboard" | "despesas" | "devem" | "fatura" | "meta" | "config";
+type Tab = "dashboard" | "despesas" | "devem" | "fatura" | "contas" | "meta" | "config";
 
 function ThemeToggle({ tema, onToggle }: { tema: "dark" | "light"; onToggle: () => void }) {
   return (
@@ -78,6 +79,7 @@ export default function App() {
           {tab === "despesas" && <Despesas />}
           {tab === "devem" && <QuemMeDeve />}
           {tab === "fatura" && <Fatura />}
+          {tab === "contas" && <ContasAPagar />}
           {tab === "meta" && <MetaPoupanca />}
           {tab === "config" && <Configuracoes onLogout={() => setAutenticado(false)} />}
         </div>
@@ -88,6 +90,7 @@ export default function App() {
         <NavBtn icon={<Wallet size={20} />} label="Despesas" active={tab === "despesas"} onClick={() => setTab("despesas")} />
         <NavBtn icon={<Users size={20} />} label="Devem" active={tab === "devem"} onClick={() => setTab("devem")} />
         <NavBtn icon={<Upload size={20} />} label="Fatura" active={tab === "fatura"} onClick={() => setTab("fatura")} />
+        <NavBtn icon={<CalendarClock size={20} />} label="Contas" active={tab === "contas"} onClick={() => setTab("contas")} />
         <NavBtn icon={<Target size={20} />} label="Meta" active={tab === "meta"} onClick={() => setTab("meta")} />
         <NavBtn icon={<Settings size={20} />} label="Config" active={tab === "config"} onClick={() => setTab("config")} />
       </nav>

@@ -1,5 +1,11 @@
 import type { DespesaFixa, ItemVariavel, MesReferencia, Reembolso } from "@quitado/shared-types";
-import { calcularSaldoMensal, type ParcelaDevedorAtivoInput, type SaldoMensalResultado } from "./despesas.js";
+import {
+  calcularSaldoMensal,
+  type DespesaFixaOverrideInput,
+  type MetaAporteInput,
+  type ParcelaDevedorAtivoInput,
+  type SaldoMensalResultado,
+} from "./despesas.js";
 import type { ParcelamentoComFatura, UltimaFaturaPorOrigem } from "./parcelamento.js";
 
 export interface ProjecaoMensal {
@@ -15,6 +21,8 @@ export interface ProjetarSaldosInput {
   itensVariaveis: ItemVariavel[];
   reembolsos: Reembolso[];
   parcelasDevedor?: ParcelaDevedorAtivoInput[];
+  aportesMeta?: MetaAporteInput[];
+  despesaFixaOverrides?: DespesaFixaOverrideInput[];
   /** Ver `SaldoMensalInput` — aplica a regra híbrida só no mês igual a `mesAtual`, meses futuros continuam por calendário. */
   mesAtual?: MesReferencia;
   ultimaFaturaPorOrigem?: UltimaFaturaPorOrigem;
@@ -35,6 +43,8 @@ export function projetarSaldos(input: ProjetarSaldosInput): ProjecaoMensal[] {
       itensVariaveis: input.itensVariaveis,
       reembolsos: input.reembolsos,
       parcelasDevedor: input.parcelasDevedor,
+      aportesMeta: input.aportesMeta,
+      despesaFixaOverrides: input.despesaFixaOverrides,
       mesReferencia: mes,
       mesAtual: input.mesAtual,
       ultimaFaturaPorOrigem: input.ultimaFaturaPorOrigem,

@@ -11,7 +11,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...options,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...options.headers },
+    // Só manda Content-Type quando tem body — mandar em request sem corpo
+    // (ex: DELETE) faz o parser JSON do Fastify rejeitar com 400
+    // FST_ERR_CTP_EMPTY_JSON_BODY, mesmo a rota nunca lendo o body.
+    headers: { ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}), ...options.headers },
   });
 
   if (res.status === 204) return undefined as T;

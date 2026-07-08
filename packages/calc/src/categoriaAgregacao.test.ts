@@ -4,9 +4,9 @@ import { totalPorCategoria } from "./categoriaAgregacao.js";
 describe("totalPorCategoria", () => {
   it("agrupa despesas fixas e parcelamentos ativos por categoria", () => {
     const despesasFixas = [
-      { id: "1", nome: "Aluguel", valorCents: 150000, categoria: null, ativo: true },
-      { id: "2", nome: "Mercado", valorCents: 100000, categoria: null, ativo: true },
-      { id: "3", nome: "Antigo", valorCents: 999, categoria: null, ativo: false },
+      { id: "1", nome: "Aluguel", valorCents: 150000, categoria: null, ativo: true, diaVencimento: null },
+      { id: "2", nome: "Mercado", valorCents: 100000, categoria: null, ativo: true, diaVencimento: null },
+      { id: "3", nome: "Antigo", valorCents: 999, categoria: null, ativo: false, diaVencimento: null },
     ];
     const parcelamentosList = [
       {
@@ -44,7 +44,16 @@ describe("totalPorCategoria", () => {
 
   it("usa a categoria manual quando definida, ignorando a heurística", () => {
     const resultado = totalPorCategoria(
-      [{ id: "1", nome: "Ifd*66482446 Ana Crist", valorCents: 6928, ativo: true, categoria: "lazer_compras" }],
+      [
+        {
+          id: "1",
+          nome: "Ifd*66482446 Ana Crist",
+          valorCents: 6928,
+          ativo: true,
+          categoria: "lazer_compras",
+          diaVencimento: null,
+        },
+      ],
       [],
       "2026-07",
     );

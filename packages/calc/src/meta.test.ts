@@ -26,40 +26,57 @@ describe("calcularProgressoMeta", () => {
 });
 
 describe("mesesRestantesMeta", () => {
-  it("conta o mês atual e o mês do prazo (ex: jul->dez = 6 meses)", () => {
-    expect(mesesRestantesMeta("2026-12", "2026-07")).toBe(6);
+  it("mês atual sem aporte ainda é uma oportunidade de guardar (ex: jul->dez = 6 meses: jul,ago,set,out,nov,dez)", () => {
+    expect(mesesRestantesMeta("2026-12", "2026-07", false)).toBe(6);
   });
 
-  it("nunca é menor que 1, mesmo com prazo já vencido", () => {
-    expect(mesesRestantesMeta("2026-01", "2026-07")).toBe(1);
+  it("mês atual já contemplado (aporte já guardado nele) não conta de novo (ex: jul->dez = 5 meses: ago,set,out,nov,dez)", () => {
+    expect(mesesRestantesMeta("2026-12", "2026-07", true)).toBe(5);
+  });
+
+  it("nunca é menor que 1, mesmo com prazo já vencido ou é o próprio mês atual", () => {
+    expect(mesesRestantesMeta("2026-01", "2026-07", false)).toBe(1);
+    expect(mesesRestantesMeta("2026-07", "2026-07", true)).toBe(1);
   });
 });
 
 describe("calcularAporteNecessario", () => {
-  it("R$10.000 faltando em 5 meses restantes -> R$2.000/mês (exemplo do usuário: 5 meses pra 10 mil)", () => {
+  it("R$10.000 faltando, nada guardado ainda, 6 meses restantes (jul..dez) -> R$1.666,67/mês (exemplo do usuário: nada guardado em julho)", () => {
     const aporte = calcularAporteNecessario(
-      { valorAlvoCents: 1_000_000, prazo: "2026-11", aporteMensalCents: 0, acumuladoCents: 0 },
+      { valorAlvoCents: 1_000_000, prazo: "2026-12", aporteMensalCents: 0, acumuladoCents: 0 },
       "2026-07",
+      false,
     );
-    // jul,ago,set,out,nov = 5 meses
-    expect(mesesRestantesMeta("2026-11", "2026-07")).toBe(5);
-    expect(aporte).toBe(200_000);
+    expect(mesesRestantesMeta("2026-12", "2026-07", false)).toBe(6);
+    expect(aporte).toBe(166_667);
+  });
+
+  it("regressão: R$10.000 de meta, R$2.780 já guardados em julho, prazo dez/26 -> R$1.444/mês (exemplo do usuário: julho já contemplado)", () => {
+    const aporte = calcularAporteNecessario(
+      { valorAlvoCents: 1_000_000, prazo: "2026-12", aporteMensalCents: 0, acumuladoCents: 278_000 },
+      "2026-07",
+      true,
+    );
+    // faltam R$7.220 em 5 meses (ago..dez) = R$1.444/mês
+    expect(aporte).toBe(144_400);
   });
 
   it("é zero quando a meta já foi atingida", () => {
     const aporte = calcularAporteNecessario(
       { valorAlvoCents: 1_000_000, prazo: "2026-12", aporteMensalCents: 0, acumuladoCents: 1_000_000 },
       "2026-07",
+      false,
     );
     expect(aporte).toBe(0);
   });
 
   it("arredonda para cima (nunca guarda menos que o necessário)", () => {
     const aporte = calcularAporteNecessario(
-      { valorAlvoCents: 1_000_000, prazo: "2026-09", aporteMensalCents: 0, acumuladoCents: 0 },
+      { valorAlvoCents: 1_000_000, prazo: "2026-10", aporteMensalCents: 0, acumuladoCents: 0 },
       "2026-07",
+      true,
     );
-    // 1_000_000 / 3 = 333333.33 -> arredonda para 333334
+    // ago,set,out = 3 meses (jul já contemplado); 1_000_000 / 3 = 333333.33 -> arredonda para 333334
     expect(aporte).toBe(333_334);
   });
 });

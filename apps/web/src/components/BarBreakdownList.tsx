@@ -16,7 +16,17 @@ export interface BarBreakdownItem {
   itens?: BarBreakdownItemDetalhe[];
 }
 
-export function BarBreakdownList({ itens, vazio }: { itens: BarBreakdownItem[]; vazio: string }) {
+export function BarBreakdownList({
+  itens,
+  vazio,
+  mostrarPercentual,
+  mostrarMarcadorFim,
+}: {
+  itens: BarBreakdownItem[];
+  vazio: string;
+  mostrarPercentual?: boolean;
+  mostrarMarcadorFim?: boolean;
+}) {
   const [aberto, setAberto] = useState<string | null>(null);
 
   if (itens.length === 0) {
@@ -24,6 +34,7 @@ export function BarBreakdownList({ itens, vazio }: { itens: BarBreakdownItem[]; 
   }
 
   const maiorTotal = Math.max(...itens.map((i) => i.totalCents));
+  const somaTotal = itens.reduce((s, i) => s + i.totalCents, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -56,9 +67,24 @@ export function BarBreakdownList({ itens, vazio }: { itens: BarBreakdownItem[]; 
                 {expandivel && <ChevronRight className={`q-chevron${estaAberto ? " aberto" : ""}`} size={12} />}
                 {item.label}
               </span>
-              <span style={{ ...styles.parcelaValor }}>{fmt(item.totalCents)}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ ...styles.parcelaValor }}>{fmt(item.totalCents)}</span>
+                {mostrarPercentual && (
+                  <span
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: "var(--fs-xs)",
+                      color: "var(--q-text-muted)",
+                      width: 34,
+                      textAlign: "right",
+                    }}
+                  >
+                    {somaTotal > 0 ? Math.round((item.totalCents / somaTotal) * 100) : 0}%
+                  </span>
+                )}
+              </span>
             </button>
-            <div style={{ height: 8, background: "var(--q-track-bg)", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ position: "relative", height: 8, background: "var(--q-track-bg)", borderRadius: 4 }}>
               <div
                 className="q-bar-fill"
                 style={{
@@ -69,6 +95,21 @@ export function BarBreakdownList({ itens, vazio }: { itens: BarBreakdownItem[]; 
                   animationDelay: `${i * 60}ms`,
                 }}
               />
+              {mostrarMarcadorFim && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${(item.totalCents / maiorTotal) * 100}%`,
+                    top: "50%",
+                    transform: "translate(-50%, -50%)",
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    background: item.cor,
+                    border: "2.5px solid var(--q-card-bg)",
+                  }}
+                />
+              )}
             </div>
             {expandivel && (
               <div className={`q-expand${estaAberto ? " aberto" : ""}`}>

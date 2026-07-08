@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcularRendaBRL, calcularSaldoMensal } from "./despesas.js";
+import { calcularRendaBRL, calcularSaldoMensal, valorDespesaFixaNoMes } from "./despesas.js";
 
 describe("calcularRendaBRL", () => {
   it("converte EUR (centavos) para BRL (centavos) pela cotação", () => {
@@ -12,8 +12,8 @@ describe("calcularSaldoMensal", () => {
     const resultado = calcularSaldoMensal({
       rendaCents: 1_767_090,
       despesasFixas: [
-        { id: "1", nome: "Aluguel", valorCents: 150_000, categoria: null, ativo: true },
-        { id: "2", nome: "Antigo (inativo)", valorCents: 999_999, categoria: null, ativo: false },
+        { id: "1", nome: "Aluguel", valorCents: 150_000, categoria: null, ativo: true, diaVencimento: null },
+        { id: "2", nome: "Antigo (inativo)", valorCents: 999_999, categoria: null, ativo: false, diaVencimento: null },
       ],
       parcelamentos: [
         {
@@ -74,5 +74,46 @@ describe("calcularSaldoMensal", () => {
     expect(resultado.recebidoDevedoresCents).toBe(30_000);
     expect(resultado.totalDespesasCents).toBe(-30_000);
     expect(resultado.saldoCents).toBe(130_000);
+  });
+
+  it("aporte de meta guardado no mês sai do saldo livre; de outros meses não conta", () => {
+    const resultado = calcularSaldoMensal({
+      rendaCents: 100_000,
+      despesasFixas: [],
+      parcelamentos: [],
+      itensVariaveis: [],
+      reembolsos: [],
+      aportesMeta: [
+        { mesReferencia: "2026-07", valorCents: 18_000 },
+        { mesReferencia: "2026-06", valorCents: 99_999 }, // outro mês, não conta
+      ],
+      mesReferencia: "2026-07",
+    });
+
+    expect(resultado.aportesMetaCents).toBe(18_000);
+    expect(resultado.totalDespesasCents).toBe(18_000);
+    expect(resultado.saldoCents).toBe(82_000);
+  });
+
+  it("override de despesa fixa vale só no mês configurado — outros meses usam o valor base", () => {
+    const aluguel = { id: "d1", nome: "Aluguel", valorCents: 150_000, categoria: null, ativo: true, diaVencimento: null };
+
+    expect(valorDespesaFixaNoMes(aluguel, "2026-07", [{ despesaFixaId: "d1", mesReferencia: "2026-07", valorCents: 180_000 }])).toBe(
+      180_000,
+    );
+    expect(valorDespesaFixaNoMes(aluguel, "2026-08", [{ despesaFixaId: "d1", mesReferencia: "2026-07", valorCents: 180_000 }])).toBe(
+      150_000,
+    );
+
+    const resultado = calcularSaldoMensal({
+      rendaCents: 200_000,
+      despesasFixas: [aluguel],
+      parcelamentos: [],
+      itensVariaveis: [],
+      reembolsos: [],
+      despesaFixaOverrides: [{ despesaFixaId: "d1", mesReferencia: "2026-07", valorCents: 180_000 }],
+      mesReferencia: "2026-07",
+    });
+    expect(resultado.despesasFixasCents).toBe(180_000);
   });
 });

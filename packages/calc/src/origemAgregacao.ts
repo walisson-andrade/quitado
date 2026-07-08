@@ -1,4 +1,5 @@
 import type { DespesaFixa, MesReferencia } from "@quitado/shared-types";
+import { type DespesaFixaOverrideInput, valorDespesaFixaNoMes } from "./despesas.js";
 import {
   parcelamentoContaNoMes,
   type ParcelamentoComFatura,
@@ -11,17 +12,16 @@ export interface OrigemItemDetalhe {
 }
 
 export interface OrigemTotal {
-  origem: "fixo" | "Inter" | "Nubank";
+  /** "fixo" pro balde de despesas fixas + parcelamentos manuais, ou o nome do cartão/banco pra qualquer outra origem. */
+  origem: string;
   label: string;
   totalCents: number;
   itens: OrigemItemDetalhe[];
 }
 
-const LABEL_POR_ORIGEM: Record<OrigemTotal["origem"], string> = {
-  fixo: "Custos Fixos",
-  Inter: "Fatura Inter",
-  Nubank: "Fatura Nubank",
-};
+function labelPorOrigem(origem: string): string {
+  return origem === "fixo" ? "Custos Fixos" : `Fatura ${origem}`;
+}
 
 type ParcelamentoComOrigem = ParcelamentoComFatura & {
   nome: string;
@@ -29,32 +29,36 @@ type ParcelamentoComOrigem = ParcelamentoComFatura & {
   origem: string | null;
 };
 
-function bucketDaOrigem(origem: string | null): OrigemTotal["origem"] {
-  if (origem === "Inter") return "Inter";
-  if (origem === "Nubank") return "Nubank";
-  return "fixo"; // manual, null, ou qualquer outra origem entra em "Custos Fixos" pra bater com o extrato real
+/**
+ * Qualquer origem de fatura importada (Inter, Nubank, ou um cartão com nome
+ * customizado como "Nubank Walisson") vira seu próprio balde — só cai em
+ * "fixo" quem não veio de fatura nenhuma (origem "manual" ou null).
+ */
+function bucketDaOrigem(origem: string | null): string {
+  if (origem && origem !== "manual") return origem;
+  return "fixo";
 }
 
 /**
- * Agrupa o total do mês em só 3 baldes — Custos Fixos, Fatura Inter, Fatura
- * Nubank — cada um com a lista de itens que compõem o total, pra o usuário
- * conferir manualmente contra o extrato real. "Custos Fixos" junta despesas
- * fixas (sem prazo) com parcelamentos que não vieram de fatura importada
- * (ex: financiamentos/empréstimos cadastrados manualmente) — do ponto de
- * vista de "quanto eu gasto por mês", ambos são a mesma coisa.
+ * Agrupa o total do mês em um balde por origem — "Custos Fixos" (despesas
+ * fixas + parcelamentos manuais) e um balde por cartão/banco de cada fatura
+ * importada (ex: "Fatura Nubank Walisson", "Fatura Santander Leticia") —
+ * cada um com a lista de itens que compõem o total, pra o usuário conferir
+ * manualmente contra o extrato real.
  */
 export function totalPorOrigem(
   despesasFixas: DespesaFixa[],
   parcelamentosList: ParcelamentoComOrigem[],
   mesAtual: MesReferencia,
   ultimaFaturaPorOrigem: UltimaFaturaPorOrigem = {},
+  despesaFixaOverrides: DespesaFixaOverrideInput[] = [],
 ): OrigemTotal[] {
   const buckets = new Map<OrigemTotal["origem"], OrigemItemDetalhe[]>();
 
   for (const d of despesasFixas) {
     if (!d.ativo) continue;
     const itens = buckets.get("fixo") ?? [];
-    itens.push({ nome: d.nome, valorCents: d.valorCents });
+    itens.push({ nome: d.nome, valorCents: valorDespesaFixaNoMes(d, mesAtual, despesaFixaOverrides) });
     buckets.set("fixo", itens);
   }
 
@@ -69,7 +73,7 @@ export function totalPorOrigem(
   return Array.from(buckets.entries())
     .map(([origem, itens]) => ({
       origem,
-      label: LABEL_POR_ORIGEM[origem],
+      label: labelPorOrigem(origem),
       totalCents: itens.reduce((acc, i) => acc + i.valorCents, 0),
       itens,
     }))

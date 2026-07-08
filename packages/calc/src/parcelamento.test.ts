@@ -161,6 +161,20 @@ describe("parcelamentoContaNoMes — regra híbrida (fatura mais recente conta i
     expect(parcelamentoContaNoMes(manual, "2026-07", "2026-07", ultimaFatura)).toBe(false);
   });
 
+  it("vale pra qualquer nome de cartão, não só Inter/Nubank — ex: 'Nubank Walisson'", () => {
+    const ultimaFaturaCustom = { "Nubank Walisson": "fatura-nw-3" };
+    const item = {
+      parcelaAtual: 1,
+      parcelaTotal: 1,
+      mesInicio: "2026-06",
+      continuaIndefinidamente: false,
+      origem: "Nubank Walisson",
+      faturaImportadaId: "fatura-nw-3",
+    };
+    expect(parcelaAindaAtiva(item, "2026-07")).toBe(false);
+    expect(parcelamentoContaNoMes(item, "2026-07", "2026-07", ultimaFaturaCustom)).toBe(true);
+  });
+
   it("calcularTotalParcelamentosNoMesHibrido soma pela regra híbrida no mês atual", () => {
     const itens = [
       {

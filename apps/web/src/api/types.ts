@@ -6,6 +6,32 @@ export interface DespesaFixaRow {
   valorCents: number;
   categoria: string | null;
   ativo: boolean;
+  diaVencimento: number | null;
+}
+
+export interface DespesaFixaOverrideRow {
+  id: string;
+  despesaFixaId: string;
+  mesReferencia: MesReferencia;
+  valorCents: number;
+}
+
+export interface CartaoRow {
+  id: string;
+  nome: string;
+  diaVencimento: number | null;
+  corHex: string | null;
+  ativo: boolean;
+}
+
+export interface ContaPagamentoRow {
+  id: string;
+  despesaFixaId: string | null;
+  cartaoId: string | null;
+  parcelamentoId: string | null;
+  mesReferencia: MesReferencia;
+  status: "pendente" | "pago";
+  pagoEm: string | null;
 }
 
 export interface ParcelamentoRow {
@@ -20,6 +46,7 @@ export interface ParcelamentoRow {
   categoria: string | null;
   continuaIndefinidamente: boolean;
   faturaImportadaId: string | null;
+  diaVencimento: number | null;
 }
 
 export interface DevedorRow {
@@ -53,6 +80,13 @@ export interface MetaPoupancaRow {
   acumuladoCents: number;
 }
 
+export interface MetaAporteRow {
+  id: string;
+  mesReferencia: MesReferencia;
+  valorCents: number;
+  criadoEm: string;
+}
+
 export interface FaturaImportadaRow {
   id: string;
   tipoOrigem: "pdf_imagem_ia" | "csv_nubank";
@@ -60,6 +94,9 @@ export interface FaturaImportadaRow {
   nomeArquivo: string;
   arquivoStorageKey: string | null;
   mesReferenciaSugerido: MesReferencia | null;
+  titularSugerido: string | null;
+  bancoSugerido: string | null;
+  totalFaturaSugeridoCents: number | null;
   jsonExtraido: ItemFaturaStaged[];
   jsonConfirmado: ItemFaturaStaged[] | null;
   status: "processando" | "pendente_revisao" | "confirmado" | "descartado";
@@ -81,6 +118,7 @@ export interface SaldoMensalResultado {
   itensVariaveisCents: number;
   reembolsosCents: number;
   recebidoDevedoresCents: number;
+  aportesMetaCents: number;
   totalDespesasCents: number;
   saldoCents: number;
 }
@@ -98,7 +136,8 @@ export interface CategoriaTotal {
 }
 
 export interface OrigemTotal {
-  origem: "fixo" | "Inter" | "Nubank";
+  /** "fixo" pro balde de despesas fixas + parcelamentos manuais, ou o nome do cartão/banco pra qualquer outra origem. */
+  origem: string;
   label: string;
   totalCents: number;
   itens: OrigemItemDetalhe[];
