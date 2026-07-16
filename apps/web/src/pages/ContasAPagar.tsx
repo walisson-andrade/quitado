@@ -168,7 +168,7 @@ export function ContasAPagar() {
     }
 
     return (
-      <button className="q-btn" onClick={() => alternarPago(item, status)} style={styles.timelineRow}>
+      <div style={styles.timelineRow}>
         <div style={{ ...styles.timelineBadge, background: badgeBg, border: `1.5px solid ${badgeBorder}`, color: badgeColor }}>
           {semDia ? (
             <>
@@ -203,7 +203,20 @@ export function ContasAPagar() {
         >
           {item.valorCents != null ? fmt(item.valorCents) : "fatura variável"}
         </span>
-      </button>
+        <button
+          className="q-btn"
+          onClick={() => alternarPago(item, status)}
+          aria-label={isPago ? "Marcar como pendente" : "Marcar como pago"}
+          title={isPago ? "Marcar como pendente" : "Marcar como pago"}
+          style={{
+            ...styles.timelineCheckbox,
+            background: isPago ? "var(--q-teal)" : "transparent",
+            border: `2px solid ${isPago ? "var(--q-teal)" : "var(--q-border-input)"}`,
+          }}
+        >
+          {isPago && <Check size={14} color="var(--q-on-accent)" strokeWidth={3} />}
+        </button>
+      </div>
     );
   }
 

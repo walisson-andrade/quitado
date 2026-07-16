@@ -252,8 +252,8 @@ export function GanttTimeline({ meses, parcelamentos }: { meses: MesReferencia[]
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                    <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={15} color={g.cor} />
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flexWrap: "wrap" }}>
+                    <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={15} color={g.cor} style={{ flexShrink: 0 }} />
                     <span
                       style={{
                         fontFamily: "'Space Grotesk', sans-serif",
@@ -262,6 +262,8 @@ export function GanttTimeline({ meses, parcelamentos }: { meses: MesReferencia[]
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
+                        minWidth: 0,
+                        flex: "1 1 auto",
                       }}
                     >
                       {g.label}
