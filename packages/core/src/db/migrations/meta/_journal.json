@@ -78,6 +78,13 @@
       "when": 1784231009337,
       "tag": "0010_multi_usuario_households",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784676807410,
+      "tag": "0011_multi_household_membership",
+      "breakpoints": true
     }
   ]
 }

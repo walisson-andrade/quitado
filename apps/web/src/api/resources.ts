@@ -13,6 +13,7 @@ import type {
   HouseholdRow,
   MetaAporteRow,
   MetaPoupancaRow,
+  MinhaFamilia,
   ParcelaDevedorRow,
   ParcelamentoRow,
   ReembolsoRow,
@@ -22,6 +23,8 @@ import type {
 export const authApi = {
   logout: () => api.post<{ ok: true }>("/auth/logout"),
   obterUsuarioAtual: () => api.get<UsuarioAtual>("/auth/me"),
+  listarMinhasFamilias: () => api.get<MinhaFamilia[]>("/auth/minhas-familias"),
+  trocarFamilia: (householdId: string) => api.post<{ ok: true }>("/auth/trocar-familia", { householdId }),
 };
 
 export const householdApi = {

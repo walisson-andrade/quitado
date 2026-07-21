@@ -38,6 +38,8 @@ export const routes: Route[] = [
   { method: "GET", pattern: "/auth/google/callback", handler: authHandlers.callbackGoogle },
   { method: "POST", pattern: "/auth/logout", handler: authHandlers.logout },
   { method: "GET", pattern: "/auth/me", handler: protegida(authHandlers.obterUsuarioAtual) },
+  { method: "GET", pattern: "/auth/minhas-familias", handler: protegida(authHandlers.listarMinhasFamilias) },
+  { method: "POST", pattern: "/auth/trocar-familia", handler: protegida(authHandlers.trocarFamilia) },
 
   { method: "GET", pattern: "/household", handler: protegida(householdHandlers.obterHousehold) },
   { method: "PATCH", pattern: "/household", handler: protegida(householdHandlers.atualizarHousehold) },

@@ -125,6 +125,13 @@ export interface HouseholdRow {
   membros: MembroHousehold[];
 }
 
+export interface MinhaFamilia {
+  id: string;
+  nome: string;
+  papel: string;
+  ativa: boolean;
+}
+
 export interface ConviteRow {
   id: string;
   token: string;

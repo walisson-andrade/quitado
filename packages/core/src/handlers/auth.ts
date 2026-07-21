@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 import { montarUrlLoginGoogle, trocarCodePorPerfil } from "../auth/google.js";
 import { assinarSessao, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, verificarSessao } from "../auth/jwt.js";
 import { households, householdInvites, householdMembers, users } from "../db/schema.js";
@@ -56,25 +57,46 @@ export const callbackGoogle: Handler = async ({ db, query }) => {
     .returning();
   if (!user) throw new HttpError(500, "Falha ao registrar usuário.");
 
-  const [membroExistente] = await db.select().from(householdMembers).where(eq(householdMembers.userId, user.id)).limit(1);
-
+  // Convite tem prioridade mesmo se a pessoa já é membro de outro household —
+  // uma pessoa pode fazer parte de várias famílias (ex: a dela e a do
+  // parceiro), então clicar num link de convite é sempre "entra/troca pra
+  // essa aqui", nunca ignorado por já ter household.
   let householdId: string;
-  if (membroExistente) {
-    householdId = membroExistente.householdId;
-  } else if (convite) {
+  if (convite) {
     const [conviteRow] = await db.select().from(householdInvites).where(eq(householdInvites.token, convite)).limit(1);
     if (!conviteRow || conviteRow.usadoEm || conviteRow.expiraEm < new Date()) {
       return { status: 302, body: null, redirectTo: `${webOrigin}/?erro=convite_invalido` };
     }
     householdId = conviteRow.householdId;
+
+    const [jaEhMembro] = await db
+      .select()
+      .from(householdMembers)
+      .where(and(eq(householdMembers.userId, user.id), eq(householdMembers.householdId, householdId)))
+      .limit(1);
+    if (!jaEhMembro) {
+      await db.insert(householdMembers).values({ householdId, userId: user.id, papel: "membro" });
+    }
     await db.update(householdInvites).set({ usadoEm: new Date() }).where(eq(householdInvites.id, conviteRow.id));
-    await db.insert(householdMembers).values({ householdId, userId: user.id, papel: "membro" });
+  } else if (user.activeHouseholdId) {
+    householdId = user.activeHouseholdId;
   } else {
-    const [household] = await db.insert(households).values({ nome: perfil.nome ? `Família ${perfil.nome}` : "Minha família" }).returning();
-    if (!household) throw new HttpError(500, "Falha ao criar household.");
-    householdId = household.id;
-    await db.insert(householdMembers).values({ householdId, userId: user.id, papel: "dono" });
+    const [membroExistente] = await db
+      .select()
+      .from(householdMembers)
+      .where(eq(householdMembers.userId, user.id))
+      .limit(1);
+    if (membroExistente) {
+      householdId = membroExistente.householdId;
+    } else {
+      const [household] = await db.insert(households).values({ nome: perfil.nome ? `Família ${perfil.nome}` : "Minha família" }).returning();
+      if (!household) throw new HttpError(500, "Falha ao criar household.");
+      householdId = household.id;
+      await db.insert(householdMembers).values({ householdId, userId: user.id, papel: "dono" });
+    }
   }
+
+  await db.update(users).set({ activeHouseholdId: householdId }).where(eq(users.id, user.id));
 
   const token = await assinarSessao({ userId: user.id, householdId });
   return {
@@ -99,6 +121,39 @@ export const obterUsuarioAtual: Handler = async ({ db, session }) => {
   return {
     status: 200,
     body: { id: user.id, email: user.email, nome: user.nome, avatarUrl: user.avatarUrl },
+  };
+};
+
+/** Todas as famílias de que a pessoa faz parte — alimenta o seletor de família nas Configurações. */
+export const listarMinhasFamilias: Handler = async ({ db, session }) => {
+  const rows = await db
+    .select({ id: households.id, nome: households.nome, papel: householdMembers.papel })
+    .from(householdMembers)
+    .innerJoin(households, eq(households.id, householdMembers.householdId))
+    .where(eq(householdMembers.userId, session!.userId));
+  return { status: 200, body: rows.map((r) => ({ ...r, ativa: r.id === session!.householdId })) };
+};
+
+const TrocarFamiliaInputSchema = z.object({ householdId: z.string().uuid() });
+
+/** Troca a família ativa da sessão — só entre famílias das quais a pessoa já é membro. */
+export const trocarFamilia: Handler = async ({ db, body, session }) => {
+  const { householdId } = TrocarFamiliaInputSchema.parse(body);
+
+  const [membro] = await db
+    .select()
+    .from(householdMembers)
+    .where(and(eq(householdMembers.userId, session!.userId), eq(householdMembers.householdId, householdId)))
+    .limit(1);
+  if (!membro) throw new HttpError(404, "Você não faz parte dessa família.");
+
+  await db.update(users).set({ activeHouseholdId: householdId }).where(eq(users.id, session!.userId));
+
+  const token = await assinarSessao({ userId: session!.userId, householdId });
+  return {
+    status: 200,
+    body: { ok: true },
+    setCookies: [{ name: SESSION_COOKIE_NAME, value: token, maxAgeSeconds: SESSION_MAX_AGE_SECONDS }],
   };
 };
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, Pencil, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Pencil, Trash2, UserPlus } from "lucide-react";
 import { authApi, cartoesApi, configApi, householdApi } from "../api/resources.js";
-import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow } from "../api/types.js";
+import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow, MinhaFamilia } from "../api/types.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
 import { styles } from "../styles.js";
@@ -160,6 +160,53 @@ function LinhaConvite({ convite, onRemover }: { convite: ConviteRow; onRemover: 
   );
 }
 
+/** Só aparece quando a pessoa faz parte de mais de uma família (ex: a dela e a do parceiro) — trocar recarrega o app inteiro pro contexto da família escolhida. */
+function SecaoMinhasFamilias() {
+  const [familias, setFamilias] = useState<MinhaFamilia[]>([]);
+  const [trocando, setTrocando] = useState<string | null>(null);
+
+  useEffect(() => {
+    authApi.listarMinhasFamilias().then(setFamilias);
+  }, []);
+
+  async function trocar(householdId: string) {
+    setTrocando(householdId);
+    try {
+      await authApi.trocarFamilia(householdId);
+      window.location.reload();
+    } catch {
+      setTrocando(null);
+    }
+  }
+
+  if (familias.length <= 1) return null;
+
+  return (
+    <section className="q-surface" style={styles.panel}>
+      <div style={styles.panelHeadRow}>
+        <h3 style={styles.panelTitle}>Trocar de família</h3>
+        <span style={styles.panelHint}>você faz parte de mais de uma — escolha qual ver agora</span>
+      </div>
+      {familias.map((f) => (
+        <div key={f.id} style={styles.listRow}>
+          <div style={styles.listRowMain}>
+            <span>{f.nome}</span>
+            <span style={{ ...styles.panelHint, color: f.ativa ? "var(--q-teal)" : undefined }}>
+              {f.papel} {f.ativa ? "· ativa agora" : ""}
+            </span>
+          </div>
+          {!f.ativa && (
+            <button className="q-btn" style={styles.buttonGhost} disabled={trocando === f.id} onClick={() => trocar(f.id)}>
+              <ArrowLeftRight size={14} />
+              {trocando === f.id ? "Trocando…" : "Trocar pra essa"}
+            </button>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function SecaoFamilia() {
   const [household, setHousehold] = useState<HouseholdRow | null>(null);
   const [convites, setConvites] = useState<ConviteRow[]>([]);
@@ -299,6 +346,8 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
       </section>
 
       <SecaoCartoes />
+
+      <SecaoMinhasFamilias />
 
       <SecaoFamilia />
 

@@ -26,6 +26,8 @@ export const users = pgTable("quitado_users", {
   email: text("email").notNull().unique(),
   nome: text("nome"),
   avatarUrl: text("avatar_url"),
+  /** Household que a sessão usa por padrão no próximo login — uma pessoa pode ser membro de várias (ex: família dela e a do parceiro), trocando pela tela de Configurações. */
+  activeHouseholdId: uuid("active_household_id").references(() => households.id, { onDelete: "set null" }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
