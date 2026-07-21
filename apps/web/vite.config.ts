@@ -11,6 +11,13 @@ export default defineConfig({
       // sincronizados (IndexedDB) — sem fila de escrita offline, fora de escopo do v1.
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+        // O modo SPA do workbox (navigateFallback) manda TODA navegação que
+        // não seja um asset já cacheado pro index.html, pra rotas client-side
+        // funcionarem offline — mas isso também pega login/callback do
+        // Google, que precisam ser navegações de verdade até a rede. Sem
+        // esse denylist, o clique em "Entrar com Google" recarrega o próprio
+        // app em vez de sair pro Google.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             // request.mode !== "navigate" é essencial aqui: login/callback do
