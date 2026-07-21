@@ -13,7 +13,13 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            // request.mode !== "navigate" é essencial aqui: login/callback do
+            // Google são navegações de página inteira que respondem com
+            // redirect, e o Chrome não deixa um service worker resolver uma
+            // navegação com resposta redirecionada — sem essa checagem, o
+            // clique em "Entrar com Google" falha silenciosamente e cai de
+            // volta no app cacheado.
+            urlPattern: ({ url, request }) => url.pathname.startsWith("/api/") && request.mode !== "navigate",
             handler: "NetworkFirst",
             options: { cacheName: "quitado-api-cache", networkTimeoutSeconds: 5 },
           },
