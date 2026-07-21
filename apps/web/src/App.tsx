@@ -51,7 +51,7 @@ export default function App() {
         <div style={{ position: "absolute", top: 18, right: 18 }}>
           <ThemeToggle tema={tema} onToggle={alternarTema} />
         </div>
-        <Login onLogin={() => setAutenticado(true)} />
+        <Login />
       </div>
     );
   }

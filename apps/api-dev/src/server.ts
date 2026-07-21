@@ -37,6 +37,11 @@ app.all("/api/*", async (request, reply) => {
       });
     }
 
+    if (result.redirectTo) {
+      reply.status(result.status).header("Location", result.redirectTo).send();
+      return;
+    }
+
     reply.status(result.status).send(result.body);
   } catch (err) {
     const { status, body } = toErrorResponse(err);

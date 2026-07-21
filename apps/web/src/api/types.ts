@@ -104,6 +104,35 @@ export interface FaturaImportadaRow {
   confirmadoEm: string | null;
 }
 
+export interface UsuarioAtual {
+  id: string;
+  email: string;
+  nome: string | null;
+  avatarUrl: string | null;
+}
+
+export interface MembroHousehold {
+  id: string;
+  nome: string | null;
+  email: string;
+  avatarUrl: string | null;
+  papel: string;
+}
+
+export interface HouseholdRow {
+  id: string;
+  nome: string;
+  membros: MembroHousehold[];
+}
+
+export interface ConviteRow {
+  id: string;
+  token: string;
+  expiraEm: string;
+  usadoEm: string | null;
+  criadoEm: string;
+}
+
 export interface ConfigRow {
   salarioEurCents: number;
   eurBrlRate: number | null;

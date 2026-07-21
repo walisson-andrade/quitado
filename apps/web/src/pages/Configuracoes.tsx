@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import { authApi, cartoesApi, configApi } from "../api/resources.js";
-import { ApiError } from "../api/client.js";
-import type { CartaoRow, ConfigRow } from "../api/types.js";
+import { Check, Copy, Pencil, Trash2, UserPlus } from "lucide-react";
+import { authApi, cartoesApi, configApi, householdApi } from "../api/resources.js";
+import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow } from "../api/types.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
 import { styles } from "../styles.js";
@@ -130,15 +129,120 @@ function SecaoCartoes() {
   );
 }
 
+function LinhaConvite({ convite, onRemover }: { convite: ConviteRow; onRemover: () => void }) {
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiarLink() {
+    const url = `${window.location.origin}/?convite=${convite.token}`;
+    await navigator.clipboard.writeText(url);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+
+  const expiraEm = new Date(convite.expiraEm);
+
+  return (
+    <div style={styles.listRow}>
+      <div style={styles.listRowMain}>
+        <span>Convite pendente</span>
+        <span style={styles.panelHint}>expira em {expiraEm.toLocaleDateString("pt-BR")}</span>
+      </div>
+      <div style={styles.listRowActions}>
+        <button className="q-btn" style={styles.buttonGhost} onClick={copiarLink}>
+          {copiado ? <Check size={14} color="var(--q-teal)" /> : <Copy size={14} />}
+          {copiado ? "Copiado" : "Copiar link"}
+        </button>
+        <button className="q-btn" style={{ ...styles.buttonGhost, padding: 8 }} onClick={onRemover} aria-label="Cancelar convite">
+          <Trash2 size={14} color="var(--q-orange)" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SecaoFamilia() {
+  const [household, setHousehold] = useState<HouseholdRow | null>(null);
+  const [convites, setConvites] = useState<ConviteRow[]>([]);
+  const [nome, setNome] = useState("");
+
+  function carregar() {
+    householdApi.obter().then((h) => {
+      setHousehold(h);
+      setNome(h.nome);
+    });
+    householdApi.listarConvites().then(setConvites);
+  }
+
+  useEffect(carregar, []);
+
+  async function salvarNome(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    const atualizado = await householdApi.atualizar(nome.trim());
+    setHousehold(atualizado);
+  }
+
+  async function gerarConvite() {
+    await householdApi.criarConvite();
+    householdApi.listarConvites().then(setConvites);
+  }
+
+  async function removerConvite(id: string) {
+    await householdApi.removerConvite(id);
+    setConvites((atual) => atual.filter((c) => c.id !== id));
+  }
+
+  if (!household) return null;
+
+  return (
+    <section className="q-surface" style={styles.panel}>
+      <div style={styles.panelHeadRow}>
+        <h3 style={styles.panelTitle}>Família</h3>
+        <span style={styles.panelHint}>quem compartilha esses dados com você</span>
+      </div>
+
+      <form onSubmit={salvarNome} style={{ ...styles.formRow, marginBottom: 12 }}>
+        <Field label="Nome da família">
+          <input value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} />
+        </Field>
+        <button className="q-btn" type="submit" style={styles.buttonGhost}>
+          Salvar
+        </button>
+      </form>
+
+      {household.membros.map((membro) => (
+        <div key={membro.id} style={styles.listRow}>
+          <div style={styles.listRowMain}>
+            <span>{membro.nome ?? membro.email}</span>
+            <span style={styles.panelHint}>
+              {membro.email} · {membro.papel}
+            </span>
+          </div>
+        </div>
+      ))}
+
+      {convites.map((convite) => (
+        <LinhaConvite key={convite.id} convite={convite} onRemover={() => removerConvite(convite.id)} />
+      ))}
+
+      <button
+        className="q-btn"
+        style={{ ...styles.buttonGhost, width: "100%", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+        onClick={gerarConvite}
+      >
+        <UserPlus size={14} />
+        Convidar alguém
+      </button>
+    </section>
+  );
+}
+
 export function Configuracoes({ onLogout }: { onLogout: () => void }) {
   const [config, setConfig] = useState<ConfigRow | null>(null);
   const [salarioEur, setSalarioEur] = useState("");
   const [cotacao, setCotacao] = useState("");
   const [mesOverride, setMesOverride] = useState("");
-  const [senhaAtual, setSenhaAtual] = useState("");
-  const [novaSenha, setNovaSenha] = useState("");
   const [mensagem, setMensagem] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     configApi.obter().then((c) => {
@@ -158,19 +262,6 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
     });
     setConfig(atualizado);
     setMensagem("Configurações salvas.");
-  }
-
-  async function salvarSenha(e: React.FormEvent) {
-    e.preventDefault();
-    setErro(null);
-    try {
-      await authApi.trocarSenha(senhaAtual, novaSenha);
-      setSenhaAtual("");
-      setNovaSenha("");
-      setMensagem("Senha alterada.");
-    } catch (err) {
-      setErro(err instanceof ApiError ? err.message : "Não foi possível trocar a senha");
-    }
   }
 
   async function sair() {
@@ -209,25 +300,7 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
 
       <SecaoCartoes />
 
-      <section className="q-surface" style={styles.panel}>
-        <div style={styles.panelHeadRow}>
-          <h3 style={styles.panelTitle}>Trocar senha</h3>
-        </div>
-        <form onSubmit={salvarSenha}>
-          <div style={styles.formRow}>
-            <Field label="Senha atual">
-              <input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} style={styles.input} />
-            </Field>
-            <Field label="Nova senha">
-              <input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} style={styles.input} />
-            </Field>
-          </div>
-          {erro && <div style={styles.errorText}>{erro}</div>}
-          <button className="q-btn" type="submit" style={{ ...styles.button, width: "100%" }}>
-            Trocar senha
-          </button>
-        </form>
-      </section>
+      <SecaoFamilia />
 
       {mensagem && <div style={styles.panelHint}>{mensagem}</div>}
 

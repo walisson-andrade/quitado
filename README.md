@@ -24,20 +24,19 @@ Pegue a connection string em **Project Settings → Database → Connection stri
 Pré-requisitos: Docker Desktop, Node 20+, pnpm (`npm install -g pnpm`), um projeto Supabase criado.
 
 ```bash
-cp .env.example .env      # edite DATABASE_URL, JWT_SECRET e GEMINI_API_KEY
+cp .env.example .env      # edite DATABASE_URL, JWT_SECRET, GOOGLE_CLIENT_ID/SECRET e GEMINI_API_KEY
 pnpm install
 
-# gera e aplica as migrations, popula a senha de dev (só na primeira vez)
+# gera e aplica as migrations
 cd packages/core
 node --env-file=../../.env ../../node_modules/tsx/dist/cli.mjs src/db/migrate.ts
-node --env-file=../../.env ../../node_modules/tsx/dist/cli.mjs src/db/seed.ts
 cd ../..
 
 docker compose up -d --build api-dev   # API em http://localhost:3011
 pnpm --filter @quitado/web dev         # Frontend em http://localhost:5173
 ```
 
-Login de dev: senha `quitado-dev` (ou o valor de `SEED_DEV_PASSWORD` no `.env`) — troque depois pela tela de Configurações.
+Login é via Google — crie um OAuth Client (tipo "Web application") no [Google Cloud Console](https://console.cloud.google.com/apis/credentials), com a tela de consentimento em modo **Testing** e seu email (e o de quem mais for usar) em **Test users**. Registre `http://localhost:5173/api/auth/google/callback` como redirect URI autorizado e coloque o Client ID/Secret no `.env`. O primeiro login sem convite pendente cria automaticamente um household novo pro usuário.
 
 **Nota**: se a senha do banco no `DATABASE_URL` tiver caracteres especiais, evite `source .env`/exportar a variável direto no shell (bash pode quebrar a sintaxe) — use `node --env-file=.env` como acima, que lê o arquivo sem passar pelo shell.
 
@@ -60,6 +59,6 @@ Defina `GEMINI_API_KEY` (Google AI Studio, camada gratuita) no `.env` para o cam
 
 ## Status atual
 
-Implementado e testado localmente via Docker: CRUD de despesas fixas e parcelamentos, dashboard com saldo projetado e timeline Gantt das dívidas, "quem me deve", meta de poupança, upload de fatura (Gemini para PDF/foto + parser determinístico para CSV do Nubank) com tela de revisão antes de persistir, autenticação por senha, PWA instalável (manifest + service worker com cache de leitura offline).
+Implementado e testado localmente via Docker: CRUD de despesas fixas e parcelamentos, dashboard com saldo projetado e timeline Gantt das dívidas, "quem me deve", meta de poupança, upload de fatura (Gemini para PDF/foto + parser determinístico para CSV do Nubank) com tela de revisão antes de persistir, login via Google com households (famílias) compartilhando dados e convite por link, PWA instalável (manifest + service worker com cache de leitura offline).
 
 **Pendente**: deploy em produção na Vercel (banco já é o Supabase; falta configurar Vercel Blob para storage de arquivo e as env vars do projeto na Vercel) — falta acesso real às contas Vercel/Gemini do usuário. Ver `apps/api/vercel.json` e a seção de bloqueios técnicos no plano para o que ainda precisa ser decidido (rewrite entre projeto do frontend e da API, extração assíncrona para não esbarrar no timeout de function).

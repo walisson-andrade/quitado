@@ -1,27 +1,21 @@
-import { useState } from "react";
-import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
-import { authApi } from "../api/resources.js";
-import { ApiError } from "../api/client.js";
+import { Lock } from "lucide-react";
 import { styles } from "../styles.js";
 
-export function Login({ onLogin }: { onLogin: () => void }) {
-  const [senha, setSenha] = useState("");
-  const [mostrar, setMostrar] = useState(false);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
+const MENSAGENS_ERRO: Record<string, string> = {
+  login_cancelado: "Login cancelado.",
+  login_falhou: "Não foi possível entrar com o Google. Tente de novo.",
+  convite_invalido: "Esse convite não é mais válido — peça um novo link pra quem te convidou.",
+};
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setErro(null);
-    setCarregando(true);
-    try {
-      await authApi.login(senha);
-      onLogin();
-    } catch (err) {
-      setErro(err instanceof ApiError ? err.message : "Não foi possível entrar");
-    } finally {
-      setCarregando(false);
-    }
+export function Login() {
+  const params = new URLSearchParams(window.location.search);
+  const erro = params.get("erro");
+  const convite = params.get("convite");
+
+  function entrarComGoogle() {
+    const url = new URL("/api/auth/google/login", window.location.origin);
+    if (convite) url.searchParams.set("convite", convite);
+    window.location.href = url.toString();
   }
 
   return (
@@ -29,46 +23,24 @@ export function Login({ onLogin }: { onLogin: () => void }) {
       <div style={styles.loginGlowTop} aria-hidden />
       <div style={styles.loginGlowBottom} aria-hidden />
 
-      <form className="q-surface" style={styles.loginCard} onSubmit={handleSubmit}>
+      <div className="q-surface" style={styles.loginCard}>
         <div style={styles.loginLogo}>Q</div>
         <div style={styles.loginBrandName}>Quitado</div>
-        <div style={styles.loginBrandSub}>seu dinheiro, sem mistério</div>
-
-        <div style={styles.loginFieldWrap}>
-          <label style={styles.fieldLabel} htmlFor="senha">Senha de acesso</label>
-          <div className="q-login-input" style={styles.loginInputGroup}>
-            <Lock size={15} style={{ flexShrink: 0, color: "var(--q-text-muted)" }} />
-            <input
-              id="senha"
-              type={mostrar ? "text" : "password"}
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              autoFocus
-              style={styles.loginInput}
-            />
-            <button
-              type="button"
-              onClick={() => setMostrar((m) => !m)}
-              aria-label={mostrar ? "Ocultar senha" : "Mostrar senha"}
-              style={styles.loginEyeBtn}
-            >
-              {mostrar ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
+        <div style={styles.loginBrandSub}>
+          {convite ? "Você foi convidado pra uma família no Quitado" : "seu dinheiro, sem mistério"}
         </div>
 
-        {erro && <div style={styles.errorText}>{erro}</div>}
+        {erro && <div style={styles.errorText}>{MENSAGENS_ERRO[erro] ?? "Algo deu errado."}</div>}
 
-        <button className="q-btn" type="submit" disabled={carregando} style={styles.loginButton}>
-          {carregando && <Loader2 size={14} className="spin" />}
-          {carregando ? "Entrando…" : "Entrar"}
+        <button className="q-btn" type="button" onClick={entrarComGoogle} style={styles.loginButton}>
+          Entrar com Google
         </button>
 
         <div style={styles.loginFoot}>
           <Lock size={11} />
           seus dados ficam só no seu servidor
         </div>
-      </form>
+      </div>
     </div>
   );
 }

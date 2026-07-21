@@ -1,24 +1,85 @@
-import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { z } from "zod";
+import { and, eq } from "drizzle-orm";
+import { montarUrlLoginGoogle, trocarCodePorPerfil } from "../auth/google.js";
 import { assinarSessao, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, verificarSessao } from "../auth/jwt.js";
-import { appConfig } from "../db/schema.js";
+import { households, householdInvites, householdMembers, users } from "../db/schema.js";
 import { HttpError, type Handler, type HandlerContext } from "./types.js";
 
-const LoginInputSchema = z.object({ senha: z.string().min(1) });
+function getEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} não definido no ambiente.`);
+  return value;
+}
 
-export const login: Handler = async ({ db, body }) => {
-  const { senha } = LoginInputSchema.parse(body);
-  const [config] = await db.select().from(appConfig).where(eq(appConfig.id, 1)).limit(1);
-  if (!config) throw new HttpError(401, "Credenciais inválidas");
+function codificarState(convite: string | null): string {
+  return Buffer.from(JSON.stringify({ convite })).toString("base64url");
+}
 
-  const senhaValida = await bcrypt.compare(senha, config.passwordHash);
-  if (!senhaValida) throw new HttpError(401, "Credenciais inválidas");
+function decodificarState(state: string | undefined): { convite: string | null } {
+  if (!state) return { convite: null };
+  try {
+    const parsed = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+    return { convite: typeof parsed.convite === "string" ? parsed.convite : null };
+  } catch {
+    return { convite: null };
+  }
+}
 
-  const token = await assinarSessao({ tokenVersion: config.tokenVersion });
+export const iniciarLoginGoogle: Handler = async ({ query }) => {
+  const state = codificarState(query.convite ?? null);
+  return { status: 302, body: null, redirectTo: montarUrlLoginGoogle(state) };
+};
+
+export const callbackGoogle: Handler = async ({ db, query }) => {
+  const webOrigin = getEnv("WEB_ORIGIN");
+
+  if (query.error || !query.code) {
+    return { status: 302, body: null, redirectTo: `${webOrigin}/?erro=login_cancelado` };
+  }
+
+  const { convite } = decodificarState(query.state);
+
+  let perfil;
+  try {
+    perfil = await trocarCodePorPerfil(query.code);
+  } catch {
+    return { status: 302, body: null, redirectTo: `${webOrigin}/?erro=login_falhou` };
+  }
+
+  const [user] = await db
+    .insert(users)
+    .values({ googleSub: perfil.sub, email: perfil.email, nome: perfil.nome, avatarUrl: perfil.avatarUrl })
+    .onConflictDoUpdate({
+      target: users.googleSub,
+      set: { email: perfil.email, nome: perfil.nome, avatarUrl: perfil.avatarUrl },
+    })
+    .returning();
+  if (!user) throw new HttpError(500, "Falha ao registrar usuário.");
+
+  const [membroExistente] = await db.select().from(householdMembers).where(eq(householdMembers.userId, user.id)).limit(1);
+
+  let householdId: string;
+  if (membroExistente) {
+    householdId = membroExistente.householdId;
+  } else if (convite) {
+    const [conviteRow] = await db.select().from(householdInvites).where(eq(householdInvites.token, convite)).limit(1);
+    if (!conviteRow || conviteRow.usadoEm || conviteRow.expiraEm < new Date()) {
+      return { status: 302, body: null, redirectTo: `${webOrigin}/?erro=convite_invalido` };
+    }
+    householdId = conviteRow.householdId;
+    await db.update(householdInvites).set({ usadoEm: new Date() }).where(eq(householdInvites.id, conviteRow.id));
+    await db.insert(householdMembers).values({ householdId, userId: user.id, papel: "membro" });
+  } else {
+    const [household] = await db.insert(households).values({ nome: perfil.nome ? `Família ${perfil.nome}` : "Minha família" }).returning();
+    if (!household) throw new HttpError(500, "Falha ao criar household.");
+    householdId = household.id;
+    await db.insert(householdMembers).values({ householdId, userId: user.id, papel: "dono" });
+  }
+
+  const token = await assinarSessao({ userId: user.id, householdId });
   return {
-    status: 200,
-    body: { ok: true },
+    status: 302,
+    body: null,
+    redirectTo: webOrigin,
     setCookies: [{ name: SESSION_COOKIE_NAME, value: token, maxAgeSeconds: SESSION_MAX_AGE_SECONDS }],
   };
 };
@@ -31,49 +92,35 @@ export const logout: Handler = async () => {
   };
 };
 
-const TrocarSenhaInputSchema = z.object({ senhaAtual: z.string().min(1), novaSenha: z.string().min(8) });
-
-export const trocarSenha: Handler = async ({ db, body }) => {
-  const { senhaAtual, novaSenha } = TrocarSenhaInputSchema.parse(body);
-  const [config] = await db.select().from(appConfig).where(eq(appConfig.id, 1)).limit(1);
-  if (!config) throw new HttpError(401, "Credenciais inválidas");
-
-  const senhaValida = await bcrypt.compare(senhaAtual, config.passwordHash);
-  if (!senhaValida) throw new HttpError(401, "Senha atual incorreta");
-
-  const passwordHash = await bcrypt.hash(novaSenha, 10);
-  const novaTokenVersion = config.tokenVersion + 1;
-  await db
-    .update(appConfig)
-    .set({ passwordHash, tokenVersion: novaTokenVersion, updatedAt: new Date() })
-    .where(eq(appConfig.id, 1));
-
-  // trocar a senha invalida sessões antigas imediatamente (token_version não confere mais)
-  const token = await assinarSessao({ tokenVersion: novaTokenVersion });
+export const obterUsuarioAtual: Handler = async ({ db, session }) => {
+  const [user] = await db.select().from(users).where(eq(users.id, session!.userId)).limit(1);
+  if (!user) throw new HttpError(404, "Usuário não encontrado");
   return {
     status: 200,
-    body: { ok: true },
-    setCookies: [{ name: SESSION_COOKIE_NAME, value: token, maxAgeSeconds: SESSION_MAX_AGE_SECONDS }],
+    body: { id: user.id, email: user.email, nome: user.nome, avatarUrl: user.avatarUrl },
   };
 };
 
 /**
- * Envolve um handler exigindo sessão válida — a verificação de assinatura
- * JWT + token_version *é* a checagem de sessão, sem round-trip adicional
- * ao banco além de ler o token_version atual do app_config.
+ * Envolve um handler exigindo sessão válida — além de assinatura/expiração do
+ * JWT, confere se o (userId, householdId) do token ainda é membro ativo do
+ * household. É essa checagem no banco (não um contador de versão) que revoga
+ * acesso na hora quando alguém é removido do household.
  */
 export function withAuth<TBody, TParams extends Record<string, string>, TResult>(
   handler: Handler<TBody, TParams, TResult>,
 ): Handler<TBody, TParams, TResult | { erro: string }> {
   return async (ctx: HandlerContext<TBody, TParams>) => {
-    const session = await verificarSessao(ctx.cookies[SESSION_COOKIE_NAME]);
-    if (!session) throw new HttpError(401, "Não autenticado");
+    const sessao = await verificarSessao(ctx.cookies[SESSION_COOKIE_NAME]);
+    if (!sessao) throw new HttpError(401, "Não autenticado");
 
-    const [config] = await ctx.db.select().from(appConfig).where(eq(appConfig.id, 1)).limit(1);
-    if (!config || config.tokenVersion !== session.tokenVersion) {
-      throw new HttpError(401, "Sessão expirada — faça login novamente");
-    }
+    const [membro] = await ctx.db
+      .select()
+      .from(householdMembers)
+      .where(and(eq(householdMembers.userId, sessao.userId), eq(householdMembers.householdId, sessao.householdId)))
+      .limit(1);
+    if (!membro) throw new HttpError(401, "Sessão expirada — faça login novamente");
 
-    return handler(ctx);
+    return handler({ ...ctx, session: { userId: sessao.userId, householdId: sessao.householdId } });
   };
 }

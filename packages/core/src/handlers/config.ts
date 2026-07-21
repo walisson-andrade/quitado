@@ -2,11 +2,11 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { MesReferenciaSchema } from "@quitado/shared-types";
 import { resolverMesAtual } from "@quitado/calc";
-import { appConfig } from "../db/schema.js";
+import { householdConfig } from "../db/schema.js";
 import type { Handler } from "./types.js";
 
-export const obterConfig: Handler = async ({ db }) => {
-  const [config] = await db.select().from(appConfig).where(eq(appConfig.id, 1)).limit(1);
+export const obterConfig: Handler = async ({ db, session }) => {
+  const [config] = await db.select().from(householdConfig).where(eq(householdConfig.householdId, session!.householdId)).limit(1);
   return {
     status: 200,
     body: {
@@ -24,17 +24,20 @@ const AtualizarConfigInputSchema = z.object({
   mesAtualOverride: MesReferenciaSchema.nullable().optional(),
 });
 
-export const atualizarConfig: Handler = async ({ db, body }) => {
+export const atualizarConfig: Handler = async ({ db, body, session }) => {
   const input = AtualizarConfigInputSchema.parse(body);
+  const patch = {
+    ...(input.salarioEurCents !== undefined ? { salarioEurCents: input.salarioEurCents } : {}),
+    ...(input.eurBrlRate !== undefined ? { eurBrlRate: String(input.eurBrlRate) } : {}),
+    ...(input.mesAtualOverride !== undefined ? { mesAtualOverride: input.mesAtualOverride } : {}),
+  };
   const [row] = await db
-    .update(appConfig)
-    .set({
-      ...(input.salarioEurCents !== undefined ? { salarioEurCents: input.salarioEurCents } : {}),
-      ...(input.eurBrlRate !== undefined ? { eurBrlRate: String(input.eurBrlRate) } : {}),
-      ...(input.mesAtualOverride !== undefined ? { mesAtualOverride: input.mesAtualOverride } : {}),
-      updatedAt: new Date(),
+    .insert(householdConfig)
+    .values({ householdId: session!.householdId, ...patch, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: householdConfig.householdId,
+      set: { ...patch, updatedAt: new Date() },
     })
-    .where(eq(appConfig.id, 1))
     .returning();
   return { status: 200, body: row };
 };

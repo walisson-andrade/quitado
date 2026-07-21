@@ -10,24 +10,30 @@ function getSecret(): Uint8Array {
 }
 
 export interface SessionPayload {
-  tokenVersion: number;
+  userId: string;
+  householdId: string;
 }
 
 export async function assinarSessao(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ tokenVersion: payload.tokenVersion })
+  return new SignJWT({ userId: payload.userId, householdId: payload.householdId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${THIRTY_DAYS_SECONDS}s`)
     .sign(getSecret());
 }
 
-/** Retorna o payload se a assinatura e expiração forem válidas, ou null caso contrário. */
+/**
+ * Retorna o payload se a assinatura e expiração forem válidas, ou null caso
+ * contrário. Não é a única checagem de sessão válida — `withAuth` ainda
+ * confere se (userId, householdId) continuam sendo membro ativo no banco,
+ * pra revogar acesso na hora quando alguém é removido do household.
+ */
 export async function verificarSessao(token: string | undefined): Promise<SessionPayload | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, getSecret());
-    if (typeof payload.tokenVersion !== "number") return null;
-    return { tokenVersion: payload.tokenVersion };
+    if (typeof payload.userId !== "string" || typeof payload.householdId !== "string") return null;
+    return { userId: payload.userId, householdId: payload.householdId };
   } catch {
     return null;
   }

@@ -9,6 +9,7 @@ import * as despesaFixaOverridesHandlers from "./handlers/despesaFixaOverrides.j
 import * as despesasFixasHandlers from "./handlers/despesasFixas.js";
 import * as devedoresHandlers from "./handlers/devedores.js";
 import * as faturasHandlers from "./handlers/faturas.js";
+import * as householdHandlers from "./handlers/household.js";
 import * as itensVariaveisHandlers from "./handlers/itensVariaveis.js";
 import * as metaPoupancaHandlers from "./handlers/metaPoupanca.js";
 import * as parcelamentosHandlers from "./handlers/parcelamentos.js";
@@ -33,9 +34,16 @@ function protegida(handler: Handler<any, any, any>): Handler<any, any, any> {
  * são reimplementadas entre os dois ambientes, só o transporte muda.
  */
 export const routes: Route[] = [
-  { method: "POST", pattern: "/auth/login", handler: authHandlers.login },
+  { method: "GET", pattern: "/auth/google/login", handler: authHandlers.iniciarLoginGoogle },
+  { method: "GET", pattern: "/auth/google/callback", handler: authHandlers.callbackGoogle },
   { method: "POST", pattern: "/auth/logout", handler: authHandlers.logout },
-  { method: "POST", pattern: "/auth/trocar-senha", handler: protegida(authHandlers.trocarSenha) },
+  { method: "GET", pattern: "/auth/me", handler: protegida(authHandlers.obterUsuarioAtual) },
+
+  { method: "GET", pattern: "/household", handler: protegida(householdHandlers.obterHousehold) },
+  { method: "PATCH", pattern: "/household", handler: protegida(householdHandlers.atualizarHousehold) },
+  { method: "GET", pattern: "/household/convites", handler: protegida(householdHandlers.listarConvitesPendentes) },
+  { method: "POST", pattern: "/household/convites", handler: protegida(householdHandlers.criarConvite) },
+  { method: "DELETE", pattern: "/household/convites/:id", handler: protegida(householdHandlers.removerConvite) },
 
   { method: "GET", pattern: "/config", handler: protegida(configHandlers.obterConfig) },
   { method: "PATCH", pattern: "/config", handler: protegida(configHandlers.atualizarConfig) },

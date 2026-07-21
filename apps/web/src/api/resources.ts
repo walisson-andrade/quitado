@@ -4,23 +4,32 @@ import type {
   CartaoRow,
   ConfigRow,
   ContaPagamentoRow,
+  ConviteRow,
   DashboardResponse,
   DespesaFixaOverrideRow,
   DespesaFixaRow,
   DevedorRow,
   FaturaImportadaRow,
+  HouseholdRow,
   MetaAporteRow,
   MetaPoupancaRow,
   ParcelaDevedorRow,
   ParcelamentoRow,
   ReembolsoRow,
+  UsuarioAtual,
 } from "./types.js";
 
 export const authApi = {
-  login: (senha: string) => api.post<{ ok: true }>("/auth/login", { senha }),
   logout: () => api.post<{ ok: true }>("/auth/logout"),
-  trocarSenha: (senhaAtual: string, novaSenha: string) =>
-    api.post<{ ok: true }>("/auth/trocar-senha", { senhaAtual, novaSenha }),
+  obterUsuarioAtual: () => api.get<UsuarioAtual>("/auth/me"),
+};
+
+export const householdApi = {
+  obter: () => api.get<HouseholdRow>("/household"),
+  atualizar: (nome: string) => api.patch<HouseholdRow>("/household", { nome }),
+  listarConvites: () => api.get<ConviteRow[]>("/household/convites"),
+  criarConvite: () => api.post<ConviteRow>("/household/convites"),
+  removerConvite: (id: string) => api.delete<void>(`/household/convites/${id}`),
 };
 
 export const configApi = {

@@ -9,7 +9,10 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-lite-latest}
       LOCAL_STORAGE_DIR: /data/blob-storage
-      WEB_ORIGIN: http://localhost:5173
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5173/api/auth/google/callback}
       PORT: 3011
       CHOKIDAR_USEPOLLING: "true"
     ports:

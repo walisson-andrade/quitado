@@ -9,9 +9,9 @@ import {
   type ParcelaDevedorAtivoInput,
 } from "@quitado/calc";
 import {
-  appConfig,
   despesaFixaOverrides,
   despesasFixas,
+  householdConfig,
   itensVariaveis,
   metaPoupancaAportes,
   parcelamentos,
@@ -21,8 +21,9 @@ import {
 import { buscarUltimaFaturaPorOrigem } from "./faturas.js";
 import type { Handler } from "./types.js";
 
-export const obterDashboard: Handler = async ({ db, query }) => {
-  const [config] = await db.select().from(appConfig).where(eq(appConfig.id, 1)).limit(1);
+export const obterDashboard: Handler = async ({ db, query, session }) => {
+  const householdId = session!.householdId;
+  const [config] = await db.select().from(householdConfig).where(eq(householdConfig.householdId, householdId)).limit(1);
   const mesAtual = resolverMesAtual(config?.mesAtualOverride ?? null);
   const meses = gerarIntervaloMeses(mesAtual, Number(query.meses ?? 13));
 
@@ -36,14 +37,18 @@ export const obterDashboard: Handler = async ({ db, query }) => {
     despesaFixaOverridesRows,
     ultimaFaturaPorOrigem,
   ] = await Promise.all([
-    db.select().from(despesasFixas),
-    db.select().from(parcelamentos),
-    db.select().from(itensVariaveis),
-    db.select().from(reembolsos),
-    db.select().from(parcelasDevedor),
-    db.select().from(metaPoupancaAportes),
-    db.select().from(despesaFixaOverrides),
-    buscarUltimaFaturaPorOrigem(db),
+    db.select().from(despesasFixas).where(eq(despesasFixas.householdId, householdId)),
+    db.select().from(parcelamentos).where(eq(parcelamentos.householdId, householdId)),
+    db.select().from(itensVariaveis).where(eq(itensVariaveis.householdId, householdId)),
+    db.select().from(reembolsos).where(eq(reembolsos.householdId, householdId)),
+    db.select().from(parcelasDevedor).where(eq(parcelasDevedor.householdId, householdId)),
+    db.select().from(metaPoupancaAportes).where(eq(metaPoupancaAportes.householdId, householdId)),
+    db
+      .select({ id: despesaFixaOverrides.id, despesaFixaId: despesaFixaOverrides.despesaFixaId, mesReferencia: despesaFixaOverrides.mesReferencia, valorCents: despesaFixaOverrides.valorCents })
+      .from(despesaFixaOverrides)
+      .innerJoin(despesasFixas, eq(despesasFixas.id, despesaFixaOverrides.despesaFixaId))
+      .where(eq(despesasFixas.householdId, householdId)),
+    buscarUltimaFaturaPorOrigem(db, householdId),
   ]);
 
   const eurBrlRate = config ? Number(config.eurBrlRate) : 1;

@@ -17,11 +17,11 @@ import { HttpError, type Handler } from "./types.js";
  * (a fatura mais recente conta inteira, não recalculada mês a mês) sem
  * afetar a projeção de meses futuros, que continua usando o número da parcela.
  */
-export async function buscarUltimaFaturaPorOrigem(db: Db): Promise<Record<string, string>> {
+export async function buscarUltimaFaturaPorOrigem(db: Db, householdId: string): Promise<Record<string, string>> {
   const confirmadas = await db
     .select({ id: faturasImportadas.id, origem: faturasImportadas.origem, confirmadoEm: faturasImportadas.confirmadoEm })
     .from(faturasImportadas)
-    .where(eq(faturasImportadas.status, "confirmado"));
+    .where(and(eq(faturasImportadas.status, "confirmado"), eq(faturasImportadas.householdId, householdId)));
 
   const ultimaPorOrigem = new Map<string, { id: string; confirmadoEm: Date }>();
   for (const f of confirmadas) {
@@ -35,8 +35,8 @@ export async function buscarUltimaFaturaPorOrigem(db: Db): Promise<Record<string
   return Object.fromEntries(Array.from(ultimaPorOrigem.entries()).map(([origem, v]) => [origem, v.id]));
 }
 
-export const obterUltimaFaturaPorOrigem: Handler = async ({ db }) => {
-  const mapa = await buscarUltimaFaturaPorOrigem(db);
+export const obterUltimaFaturaPorOrigem: Handler = async ({ db, session }) => {
+  const mapa = await buscarUltimaFaturaPorOrigem(db, session!.householdId);
   return { status: 200, body: mapa };
 };
 
@@ -47,13 +47,21 @@ const CriarFaturaInputSchema = z.object({
   tipoOrigem: z.enum(["pdf_imagem_ia", "csv_nubank"]),
 });
 
-export const listarFaturas: Handler = async ({ db }) => {
-  const rows = await db.select().from(faturasImportadas).orderBy(desc(faturasImportadas.criadoEm));
+export const listarFaturas: Handler = async ({ db, session }) => {
+  const rows = await db
+    .select()
+    .from(faturasImportadas)
+    .where(eq(faturasImportadas.householdId, session!.householdId))
+    .orderBy(desc(faturasImportadas.criadoEm));
   return { status: 200, body: rows };
 };
 
-export const obterFatura: Handler<unknown, { id: string }> = async ({ db, params }) => {
-  const [row] = await db.select().from(faturasImportadas).where(eq(faturasImportadas.id, params.id)).limit(1);
+export const obterFatura: Handler<unknown, { id: string }> = async ({ db, params, session }) => {
+  const [row] = await db
+    .select()
+    .from(faturasImportadas)
+    .where(and(eq(faturasImportadas.id, params.id), eq(faturasImportadas.householdId, session!.householdId)))
+    .limit(1);
   if (!row) throw new HttpError(404, "Fatura não encontrada");
   return { status: 200, body: row };
 };
@@ -64,7 +72,8 @@ export const obterFatura: Handler<unknown, { id: string }> = async ({ db, params
  * (status 'processando' retornado na hora + conclusão assíncrona) para não
  * esbarrar no maxDuration de function — ver seção de bloqueios do plano.
  */
-export const criarFaturaUpload: Handler = async ({ db, body }) => {
+export const criarFaturaUpload: Handler = async ({ db, body, session }) => {
+  const householdId = session!.householdId;
   const input = CriarFaturaInputSchema.parse(body);
   const buffer = Buffer.from(input.conteudoBase64, "base64");
   const arquivoHash = createHash("sha256").update(buffer).digest("hex");
@@ -75,7 +84,13 @@ export const criarFaturaUpload: Handler = async ({ db, body }) => {
   const [duplicata] = await db
     .select()
     .from(faturasImportadas)
-    .where(and(eq(faturasImportadas.arquivoHash, arquivoHash), ne(faturasImportadas.status, "descartado")))
+    .where(
+      and(
+        eq(faturasImportadas.arquivoHash, arquivoHash),
+        eq(faturasImportadas.householdId, householdId),
+        ne(faturasImportadas.status, "descartado"),
+      ),
+    )
     .limit(1);
   if (duplicata) {
     throw new HttpError(
@@ -128,6 +143,7 @@ export const criarFaturaUpload: Handler = async ({ db, body }) => {
   const [row] = await db
     .insert(faturasImportadas)
     .values({
+      householdId,
       tipoOrigem: input.tipoOrigem,
       nomeArquivo: input.nomeArquivo,
       arquivoStorageKey: storageKey,
@@ -144,11 +160,16 @@ export const criarFaturaUpload: Handler = async ({ db, body }) => {
   return { status: 201, body: row };
 };
 
-export const confirmarFatura: Handler = async ({ db, body }) => {
+export const confirmarFatura: Handler = async ({ db, body, session }) => {
+  const householdId = session!.householdId;
   const input = ConfirmarFaturaRequestSchema.parse(body);
 
   return db.transaction(async (tx) => {
-    const [fatura] = await tx.select().from(faturasImportadas).where(eq(faturasImportadas.id, input.faturaId)).limit(1);
+    const [fatura] = await tx
+      .select()
+      .from(faturasImportadas)
+      .where(and(eq(faturasImportadas.id, input.faturaId), eq(faturasImportadas.householdId, householdId)))
+      .limit(1);
     if (!fatura) throw new HttpError(404, "Fatura não encontrada");
     if (fatura.status === "confirmado") {
       throw new HttpError(409, "Esta fatura já foi confirmada — evita duplicar os parcelamentos.");
@@ -168,7 +189,15 @@ export const confirmarFatura: Handler = async ({ db, body }) => {
     // nos meses futuros da projeção assim que o mês virasse. Por isso, toda
     // fatura confirmada substitui por completo os parcelamentos de faturas
     // ANTERIORES do mesmo cartão (nunca mexe em Custos Fixos/itens manuais).
-    await tx.delete(parcelamentos).where(and(eq(parcelamentos.origem, origemFinal), isNotNull(parcelamentos.faturaImportadaId)));
+    await tx
+      .delete(parcelamentos)
+      .where(
+        and(
+          eq(parcelamentos.origem, origemFinal),
+          eq(parcelamentos.householdId, householdId),
+          isNotNull(parcelamentos.faturaImportadaId),
+        ),
+      );
 
     // Estorno/crédito entra como parcelamento de valor NEGATIVO — reduz o
     // total da fatura sem depender de casar nome com uma despesa específica
@@ -177,6 +206,7 @@ export const confirmarFatura: Handler = async ({ db, body }) => {
     const candidatos = input.itensAprovados
       .filter((item) => item.tipo === "despesa" || item.tipo === "estorno")
       .map((item) => ({
+        householdId,
         nome: item.nome,
         valorParcelaCents: item.tipo === "estorno" ? -item.valorCents : item.valorCents,
         parcelaAtual: item.parcelaAtual ?? 1,
@@ -199,7 +229,8 @@ export const confirmarFatura: Handler = async ({ db, body }) => {
         parcelaAtual: parcelamentos.parcelaAtual,
         parcelaTotal: parcelamentos.parcelaTotal,
       })
-      .from(parcelamentos);
+      .from(parcelamentos)
+      .where(eq(parcelamentos.householdId, householdId));
     const chaveExistentes = new Set(
       existentes.map((p) => `${p.nome}|${p.valorParcelaCents}|${p.parcelaAtual}|${p.parcelaTotal}`),
     );
@@ -216,9 +247,13 @@ export const confirmarFatura: Handler = async ({ db, body }) => {
     // Cartão nasce sozinho na primeira fatura confirmada com esse nome de
     // origem — o usuário só precisa entrar no Config pra configurar o dia de
     // vencimento, não pra cadastrar o cartão em si.
-    const [cartaoExistente] = await tx.select({ id: cartoes.id }).from(cartoes).where(eq(cartoes.nome, origemFinal)).limit(1);
+    const [cartaoExistente] = await tx
+      .select({ id: cartoes.id })
+      .from(cartoes)
+      .where(and(eq(cartoes.nome, origemFinal), eq(cartoes.householdId, householdId)))
+      .limit(1);
     if (!cartaoExistente) {
-      await tx.insert(cartoes).values({ nome: origemFinal });
+      await tx.insert(cartoes).values({ householdId, nome: origemFinal });
     }
 
     const [atualizada] = await tx
@@ -236,11 +271,11 @@ export const confirmarFatura: Handler = async ({ db, body }) => {
   });
 };
 
-export const descartarFatura: Handler<unknown, { id: string }> = async ({ db, params }) => {
+export const descartarFatura: Handler<unknown, { id: string }> = async ({ db, params, session }) => {
   const [row] = await db
     .update(faturasImportadas)
     .set({ status: "descartado" })
-    .where(eq(faturasImportadas.id, params.id))
+    .where(and(eq(faturasImportadas.id, params.id), eq(faturasImportadas.householdId, session!.householdId)))
     .returning();
   if (!row) throw new HttpError(404, "Fatura não encontrada");
   return { status: 200, body: row };
@@ -252,9 +287,13 @@ export const descartarFatura: Handler<unknown, { id: string }> = async ({ db, pa
  * pra sempre num cartão que "não existe mais" do ponto de vista do usuário)
  * — mas nunca mexe em Custos Fixos ou parcelamentos manuais.
  */
-export const removerFaturaImportada: Handler<unknown, { id: string }> = async ({ db, params }) => {
+export const removerFaturaImportada: Handler<unknown, { id: string }> = async ({ db, params, session }) => {
   return db.transaction(async (tx) => {
-    const [fatura] = await tx.select().from(faturasImportadas).where(eq(faturasImportadas.id, params.id)).limit(1);
+    const [fatura] = await tx
+      .select()
+      .from(faturasImportadas)
+      .where(and(eq(faturasImportadas.id, params.id), eq(faturasImportadas.householdId, session!.householdId)))
+      .limit(1);
     if (!fatura) throw new HttpError(404, "Fatura não encontrada");
 
     await tx.delete(parcelamentos).where(eq(parcelamentos.faturaImportadaId, fatura.id));
@@ -264,8 +303,12 @@ export const removerFaturaImportada: Handler<unknown, { id: string }> = async ({
   });
 };
 
-export const obterArquivoFatura: Handler<unknown, { id: string }> = async ({ db, params }) => {
-  const [fatura] = await db.select().from(faturasImportadas).where(eq(faturasImportadas.id, params.id)).limit(1);
+export const obterArquivoFatura: Handler<unknown, { id: string }> = async ({ db, params, session }) => {
+  const [fatura] = await db
+    .select()
+    .from(faturasImportadas)
+    .where(and(eq(faturasImportadas.id, params.id), eq(faturasImportadas.householdId, session!.householdId)))
+    .limit(1);
   if (!fatura || !fatura.arquivoStorageKey) throw new HttpError(404, "Arquivo não encontrado");
 
   const buffer = await getStorage().get(fatura.arquivoStorageKey);

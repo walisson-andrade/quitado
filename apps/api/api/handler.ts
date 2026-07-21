@@ -31,6 +31,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }));
     }
 
+    if (result.redirectTo) {
+      res.status(result.status).setHeader("Location", result.redirectTo).end();
+      return;
+    }
+
     res.status(result.status).json(result.body);
   } catch (err) {
     const { status, body } = toErrorResponse(err);
