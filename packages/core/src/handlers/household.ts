@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
+import { assinarSessao, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "../auth/jwt.js";
 import { households, householdInvites, householdMembers, users } from "../db/schema.js";
 import { HttpError, type Handler } from "./types.js";
 
@@ -56,5 +57,59 @@ export const removerConvite: Handler<unknown, { id: string }> = async ({ db, par
     .where(and(eq(householdInvites.id, params.id), eq(householdInvites.householdId, session!.householdId)))
     .returning();
   if (!row) throw new HttpError(404, "Convite não encontrado");
+  return { status: 204, body: null };
+};
+
+/**
+ * Aceita um convite estando já autenticado — cobre o caso de quem já tem
+ * sessão válida no navegador (não passa pelo fluxo de login do Google, que
+ * só processa convite durante o callback OAuth). Sempre entra/troca pra essa
+ * família, mesmo já sendo membro de outra.
+ */
+export const aceitarConvite: Handler<unknown, { token: string }> = async ({ db, params, session }) => {
+  const [conviteRow] = await db.select().from(householdInvites).where(eq(householdInvites.token, params.token)).limit(1);
+  if (!conviteRow || conviteRow.usadoEm || conviteRow.expiraEm < new Date()) {
+    throw new HttpError(410, "Convite inválido ou expirado");
+  }
+
+  const householdId = conviteRow.householdId;
+  const [jaEhMembro] = await db
+    .select()
+    .from(householdMembers)
+    .where(and(eq(householdMembers.userId, session!.userId), eq(householdMembers.householdId, householdId)))
+    .limit(1);
+  if (!jaEhMembro) {
+    await db.insert(householdMembers).values({ householdId, userId: session!.userId, papel: "membro" });
+  }
+  await db.update(householdInvites).set({ usadoEm: new Date() }).where(eq(householdInvites.id, conviteRow.id));
+  await db.update(users).set({ activeHouseholdId: householdId }).where(eq(users.id, session!.userId));
+
+  const token = await assinarSessao({ userId: session!.userId, householdId });
+  return {
+    status: 200,
+    body: { ok: true },
+    setCookies: [{ name: SESSION_COOKIE_NAME, value: token, maxAgeSeconds: SESSION_MAX_AGE_SECONDS }],
+  };
+};
+
+/** Remove alguém da família — qualquer membro pode remover outro, mas não a si mesmo (evita se autoexcluir sem querer no meio do uso). */
+export const removerMembro: Handler<unknown, { userId: string }> = async ({ db, params, session }) => {
+  if (params.userId === session!.userId) {
+    throw new HttpError(400, "Você não pode remover a si mesmo — peça pra outro membro fazer isso.");
+  }
+  const [row] = await db
+    .delete(householdMembers)
+    .where(and(eq(householdMembers.userId, params.userId), eq(householdMembers.householdId, session!.householdId)))
+    .returning();
+  if (!row) throw new HttpError(404, "Membro não encontrado nessa família");
+
+  // Se essa era a família ativa da pessoa removida, limpa — assim o próximo
+  // login dela decide de novo (cai numa das outras que ainda faz parte, ou
+  // cria uma nova, em vez de tentar reentrar numa família que ela não é mais).
+  await db
+    .update(users)
+    .set({ activeHouseholdId: null })
+    .where(and(eq(users.id, params.userId), eq(users.activeHouseholdId, session!.householdId)));
+
   return { status: 204, body: null };
 };

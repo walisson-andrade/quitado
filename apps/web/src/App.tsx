@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import {
   CalendarClock, LayoutDashboard, Moon, Settings, Sun, Target, Upload, Users, Wallet,
 } from "lucide-react";
-import { configApi } from "./api/resources.js";
+import { configApi, householdApi } from "./api/resources.js";
+import { ApiError } from "./api/client.js";
 import { NavBtn } from "./components/NavBtn.js";
 import { Configuracoes } from "./pages/Configuracoes.js";
 import { ContasAPagar } from "./pages/ContasAPagar.js";
@@ -16,6 +17,38 @@ import { fontImports, styles } from "./styles.js";
 import { useTheme } from "./useTheme.js";
 
 type Tab = "dashboard" | "despesas" | "devem" | "fatura" | "contas" | "meta" | "config";
+
+/** Aparece quando alguém já logado abre um link de convite — login pelo Google só processa convite durante o próprio fluxo OAuth, então quem já tem sessão precisa desse caminho separado pra aceitar. */
+function BannerConvite({ token, onFechar }: { token: string; onFechar: () => void }) {
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function aceitar() {
+    setCarregando(true);
+    setErro(null);
+    try {
+      await householdApi.aceitarConvite(token);
+      window.location.href = "/";
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : "Não foi possível aceitar o convite");
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: "10px 16px", background: "var(--q-teal-bg, rgba(45, 212, 191, 0.12))", borderBottom: "1px solid var(--q-border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <span style={{ fontSize: "var(--fs-sm)", flex: 1, minWidth: 200 }}>
+        {erro ?? "Você recebeu um convite pra entrar em outra família."}
+      </span>
+      <button className="q-btn" onClick={aceitar} disabled={carregando} style={{ ...styles.button, padding: "6px 14px" }}>
+        {carregando ? "Aceitando…" : "Aceitar convite"}
+      </button>
+      <button className="q-btn" onClick={onFechar} style={{ ...styles.buttonGhost, padding: "6px 14px" }}>
+        Ignorar
+      </button>
+    </div>
+  );
+}
 
 function ThemeToggle({ tema, onToggle }: { tema: "dark" | "light"; onToggle: () => void }) {
   return (
@@ -34,6 +67,9 @@ export default function App() {
   const [autenticado, setAutenticado] = useState<boolean | null>(null);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [tema, alternarTema] = useTheme();
+  const [conviteToken, setConviteToken] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("convite"),
+  );
 
   useEffect(() => {
     configApi
@@ -41,6 +77,11 @@ export default function App() {
       .then(() => setAutenticado(true))
       .catch(() => setAutenticado(false));
   }, []);
+
+  function fecharConvite() {
+    setConviteToken(null);
+    window.history.replaceState(null, "", window.location.pathname);
+  }
 
   if (autenticado === null) return null;
 
@@ -59,6 +100,8 @@ export default function App() {
   return (
     <div style={styles.app}>
       <style>{fontImports}</style>
+
+      {conviteToken && <BannerConvite token={conviteToken} onFechar={fecharConvite} />}
 
       <header style={styles.header}>
         <div style={styles.brand}>

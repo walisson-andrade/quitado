@@ -46,6 +46,8 @@ export const routes: Route[] = [
   { method: "GET", pattern: "/household/convites", handler: protegida(householdHandlers.listarConvitesPendentes) },
   { method: "POST", pattern: "/household/convites", handler: protegida(householdHandlers.criarConvite) },
   { method: "DELETE", pattern: "/household/convites/:id", handler: protegida(householdHandlers.removerConvite) },
+  { method: "POST", pattern: "/household/convites/:token/aceitar", handler: protegida(householdHandlers.aceitarConvite) },
+  { method: "DELETE", pattern: "/household/membros/:userId", handler: protegida(householdHandlers.removerMembro) },
 
   { method: "GET", pattern: "/config", handler: protegida(configHandlers.obterConfig) },
   { method: "PATCH", pattern: "/config", handler: protegida(configHandlers.atualizarConfig) },

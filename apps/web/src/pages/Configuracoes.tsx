@@ -211,6 +211,7 @@ function SecaoFamilia() {
   const [household, setHousehold] = useState<HouseholdRow | null>(null);
   const [convites, setConvites] = useState<ConviteRow[]>([]);
   const [nome, setNome] = useState("");
+  const [meuId, setMeuId] = useState<string | null>(null);
 
   function carregar() {
     householdApi.obter().then((h) => {
@@ -221,6 +222,15 @@ function SecaoFamilia() {
   }
 
   useEffect(carregar, []);
+  useEffect(() => {
+    authApi.obterUsuarioAtual().then((u) => setMeuId(u.id));
+  }, []);
+
+  async function removerMembro(userId: string) {
+    if (!window.confirm("Remover essa pessoa da família? Ela perde acesso a esses dados na hora.")) return;
+    await householdApi.removerMembro(userId);
+    carregar();
+  }
 
   async function salvarNome(e: React.FormEvent) {
     e.preventDefault();
@@ -265,6 +275,19 @@ function SecaoFamilia() {
               {membro.email} · {membro.papel}
             </span>
           </div>
+          {membro.id !== meuId && (
+            <div style={styles.listRowActions}>
+              <button
+                className="q-btn"
+                style={{ ...styles.buttonGhost, padding: 8 }}
+                onClick={() => removerMembro(membro.id)}
+                aria-label="Remover da família"
+                title="Remover da família"
+              >
+                <Trash2 size={14} color="var(--q-orange)" />
+              </button>
+            </div>
+          )}
         </div>
       ))}
 

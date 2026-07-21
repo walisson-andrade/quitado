@@ -33,6 +33,8 @@ export const householdApi = {
   listarConvites: () => api.get<ConviteRow[]>("/household/convites"),
   criarConvite: () => api.post<ConviteRow>("/household/convites"),
   removerConvite: (id: string) => api.delete<void>(`/household/convites/${id}`),
+  aceitarConvite: (token: string) => api.post<{ ok: true }>(`/household/convites/${token}/aceitar`),
+  removerMembro: (userId: string) => api.delete<void>(`/household/membros/${userId}`),
 };
 
 export const configApi = {
