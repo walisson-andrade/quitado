@@ -41,7 +41,8 @@ export const callbackGoogle: Handler = async ({ db, query }) => {
   let perfil;
   try {
     perfil = await trocarCodePorPerfil(query.code);
-  } catch {
+  } catch (err) {
+    console.error("Falha ao trocar code do Google por perfil:", err);
     return { status: 302, body: null, redirectTo: `${webOrigin}/?erro=login_falhou` };
   }
 
