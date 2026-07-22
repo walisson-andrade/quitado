@@ -125,6 +125,20 @@ export const removerMembro: Handler<unknown, { userId: string }> = async ({ db, 
  * próximo login começa do zero (cria uma família nova).
  */
 export const sairDaFamilia: Handler = async ({ db, session }) => {
+  if (session!.papel === "dono") {
+    const [outroMembro] = await db
+      .select()
+      .from(householdMembers)
+      .where(and(eq(householdMembers.householdId, session!.householdId), ne(householdMembers.userId, session!.userId)))
+      .limit(1);
+    if (outroMembro) {
+      throw new HttpError(
+        409,
+        "Você é dono dessa família e ainda tem outras pessoas nela — remova todo mundo antes de sair.",
+      );
+    }
+  }
+
   await db
     .delete(householdMembers)
     .where(and(eq(householdMembers.userId, session!.userId), eq(householdMembers.householdId, session!.householdId)));

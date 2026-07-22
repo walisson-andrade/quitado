@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeftRight, Check, Copy, LogOut, Pencil, Trash2, UserPlus } from "lucide-react";
 import { authApi, cartoesApi, configApi, householdApi } from "../api/resources.js";
+import { ApiError } from "../api/client.js";
 import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow, MinhaFamilia } from "../api/types.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
@@ -251,8 +252,12 @@ function SecaoFamilia() {
 
   async function sairDaFamilia() {
     if (!window.confirm(`Sair de "${household?.nome}"? Você perde acesso a esses dados na hora.`)) return;
-    await householdApi.sair();
-    window.location.href = "/";
+    try {
+      await householdApi.sair();
+      window.location.href = "/";
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.message : "Não foi possível sair da família");
+    }
   }
 
   if (!household) return null;
