@@ -49,17 +49,19 @@ export const atualizarConfig: Handler = async ({ db, body, session }) => {
 
 const CotacaoQuerySchema = z.object({ moeda: z.enum(["EUR", "USD"]) });
 
-/** Cotação do dia via AwesomeAPI (gratuita, sem chave) — usada pelo botão "Atualizar cotação" nas Configurações. */
+/**
+ * Cotação do dia via Frankfurter (dados do Banco Central Europeu) — sem
+ * chave, sem cadastro, sem rate limit de plano gratuito compartilhado como a
+ * AwesomeAPI anônima tinha. Usada pelo botão "Atualizar cotação" nas
+ * Configurações.
+ */
 export const obterCotacaoAtual: Handler = async ({ query }) => {
   const { moeda } = CotacaoQuerySchema.parse(query);
-  const resposta = await fetch(`https://economia.awesomeapi.com.br/last/${moeda}-BRL`);
+  const resposta = await fetch(`https://api.frankfurter.dev/v1/latest?from=${moeda}&to=BRL`);
   if (!resposta.ok) {
-    // 429 (rate limit do plano gratuito) é o caso mais comum aqui — sem
-    // chave de API, ela aceita um número limitado de chamadas por período.
     throw new HttpError(502, "Não consegui buscar a cotação agora (serviço externo indisponível) — tenta de novo em instantes.");
   }
-  const data = (await resposta.json()) as Record<string, { bid: string }>;
-  const par = data[`${moeda}BRL`];
-  if (!par) throw new HttpError(502, "Cotação não encontrada na resposta da API.");
-  return { status: 200, body: { cotacao: Number(par.bid) } };
+  const data = (await resposta.json()) as { rates?: { BRL?: number } };
+  if (typeof data.rates?.BRL !== "number") throw new HttpError(502, "Cotação não encontrada na resposta da API.");
+  return { status: 200, body: { cotacao: data.rates.BRL } };
 };
