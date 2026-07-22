@@ -1,11 +1,56 @@
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Check, Copy, Crown, LogOut, Pencil, Trash2, UserPlus } from "lucide-react";
+import {
+  ArrowLeftRight, Banknote, ChevronRight, Check, Copy, CreditCard, Crown, LogOut, Pencil, Trash2, UserPlus, Users,
+} from "lucide-react";
 import { authApi, cartoesApi, configApi, householdApi } from "../api/resources.js";
 import { ApiError } from "../api/client.js";
 import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow, MinhaFamilia, MoedaSalario } from "../api/types.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
 import { styles } from "../styles.js";
+
+type SecaoId = "familia" | "renda" | "cartoes";
+
+/** Cabeçalho clicável + conteúdo que abre/fecha — mesmo padrão de "sanfona" já usado no Painel (grupo por cartão) e em Contas (seção "pagas"), só reaproveitado aqui pra Configurações não empilhar tudo sempre aberto. */
+function Acordeao({
+  icon,
+  cor,
+  titulo,
+  hint,
+  aberta,
+  onToggle,
+  children,
+}: {
+  icon: React.ReactNode;
+  cor: string;
+  titulo: string;
+  hint?: string;
+  aberta: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="q-surface" style={{ border: "1px solid var(--q-border)", borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
+      <button
+        className="q-btn"
+        onClick={onToggle}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--q-inset-bg)", border: "none", cursor: "pointer", color: "var(--q-text)", textAlign: "left" }}
+      >
+        <ChevronRight className={`q-chevron${aberta ? " aberto" : ""}`} size={15} color={cor} style={{ flexShrink: 0 }} />
+        <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--q-card-bg)" }}>
+          {icon}
+        </div>
+        <span style={{ flex: 1, minWidth: 0, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {titulo}
+        </span>
+        {hint && <span style={{ fontSize: "var(--fs-tiny)", color: "var(--q-text-faint)", flexShrink: 0 }}>{hint}</span>}
+      </button>
+      <div className={`q-expand${aberta ? " aberto" : ""}`}>
+        <div style={{ padding: aberta ? "14px" : "0 14px", overflow: "hidden" }}>{children}</div>
+      </div>
+    </div>
+  );
+}
 
 function LinhaCartao({
   item,
@@ -68,7 +113,7 @@ function LinhaCartao({
   );
 }
 
-function SecaoCartoes() {
+function SecaoCartoes({ aberta, onToggle }: { aberta: boolean; onToggle: () => void }) {
   const [cartoes, setCartoes] = useState<CartaoRow[]>([]);
   const [novoNome, setNovoNome] = useState("");
   const [novoDia, setNovoDia] = useState("");
@@ -100,12 +145,14 @@ function SecaoCartoes() {
   }
 
   return (
-    <section className="q-surface" style={styles.panel}>
-      <div style={styles.panelHeadRow}>
-        <h3 style={styles.panelTitle}>Cartões</h3>
-        <span style={styles.panelHint}>dia de vencimento de cada fatura (Nubank, Santander, Inter, etc)</span>
-      </div>
-
+    <Acordeao
+      icon={<CreditCard size={14} color="var(--q-blue)" />}
+      cor="var(--q-blue)"
+      titulo="Cartões"
+      hint={`${cartoes.length} cadastrado${cartoes.length === 1 ? "" : "s"}`}
+      aberta={aberta}
+      onToggle={onToggle}
+    >
       {cartoes.map((item) => (
         <LinhaCartao
           key={item.id}
@@ -126,7 +173,7 @@ function SecaoCartoes() {
           Adicionar
         </button>
       </form>
-    </section>
+    </Acordeao>
   );
 }
 
@@ -161,16 +208,30 @@ function LinhaConvite({ convite, onRemover }: { convite: ConviteRow; onRemover: 
   );
 }
 
-/** Só aparece quando a pessoa faz parte de mais de uma família (ex: a dela e a do parceiro) — trocar recarrega o app inteiro pro contexto da família escolhida. */
-function SecaoMinhasFamilias() {
-  const [familias, setFamilias] = useState<MinhaFamilia[]>([]);
+/** Perfil & família: troca entre famílias (se a pessoa fizer parte de mais de uma), membros, convites e sair — tudo dentro de um único acordeão. */
+function SecaoFamilia({ aberta, onToggle }: { aberta: boolean; onToggle: () => void }) {
+  const [household, setHousehold] = useState<HouseholdRow | null>(null);
+  const [convites, setConvites] = useState<ConviteRow[]>([]);
+  const [minhasFamilias, setMinhasFamilias] = useState<MinhaFamilia[]>([]);
+  const [nome, setNome] = useState("");
+  const [meuId, setMeuId] = useState<string | null>(null);
   const [trocando, setTrocando] = useState<string | null>(null);
 
+  function carregar() {
+    householdApi.obter().then((h) => {
+      setHousehold(h);
+      setNome(h.nome);
+    });
+    householdApi.listarConvites().then(setConvites);
+    authApi.listarMinhasFamilias().then(setMinhasFamilias);
+  }
+
+  useEffect(carregar, []);
   useEffect(() => {
-    authApi.listarMinhasFamilias().then(setFamilias);
+    authApi.obterUsuarioAtual().then((u) => setMeuId(u.id));
   }, []);
 
-  async function trocar(householdId: string) {
+  async function trocarFamilia(householdId: string) {
     setTrocando(householdId);
     try {
       await authApi.trocarFamilia(householdId);
@@ -179,53 +240,6 @@ function SecaoMinhasFamilias() {
       setTrocando(null);
     }
   }
-
-  if (familias.length <= 1) return null;
-
-  return (
-    <section className="q-surface" style={styles.panel}>
-      <div style={styles.panelHeadRow}>
-        <h3 style={styles.panelTitle}>Trocar de família</h3>
-        <span style={styles.panelHint}>você faz parte de mais de uma — escolha qual ver agora</span>
-      </div>
-      {familias.map((f) => (
-        <div key={f.id} style={styles.listRow}>
-          <div style={styles.listRowMain}>
-            <span>{f.nome}</span>
-            <span style={{ ...styles.panelHint, color: f.ativa ? "var(--q-teal)" : undefined }}>
-              {f.papel} {f.ativa ? "· ativa agora" : ""}
-            </span>
-          </div>
-          {!f.ativa && (
-            <button className="q-btn" style={styles.buttonGhost} disabled={trocando === f.id} onClick={() => trocar(f.id)}>
-              <ArrowLeftRight size={14} />
-              {trocando === f.id ? "Trocando…" : "Trocar pra essa"}
-            </button>
-          )}
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function SecaoFamilia() {
-  const [household, setHousehold] = useState<HouseholdRow | null>(null);
-  const [convites, setConvites] = useState<ConviteRow[]>([]);
-  const [nome, setNome] = useState("");
-  const [meuId, setMeuId] = useState<string | null>(null);
-
-  function carregar() {
-    householdApi.obter().then((h) => {
-      setHousehold(h);
-      setNome(h.nome);
-    });
-    householdApi.listarConvites().then(setConvites);
-  }
-
-  useEffect(carregar, []);
-  useEffect(() => {
-    authApi.obterUsuarioAtual().then((u) => setMeuId(u.id));
-  }, []);
 
   async function removerMembro(userId: string) {
     if (!window.confirm("Remover essa pessoa da família? Ela perde acesso a esses dados na hora.")) return;
@@ -270,11 +284,35 @@ function SecaoFamilia() {
   const souDono = household.membros.find((m) => m.id === meuId)?.papel === "dono";
 
   return (
-    <section className="q-surface" style={styles.panel}>
-      <div style={styles.panelHeadRow}>
-        <h3 style={styles.panelTitle}>Família</h3>
-        <span style={styles.panelHint}>quem compartilha esses dados com você</span>
-      </div>
+    <Acordeao
+      icon={<Users size={14} color="var(--q-teal)" />}
+      cor="var(--q-teal)"
+      titulo="Perfil & família"
+      hint={`${household.membros.length} ${household.membros.length === 1 ? "pessoa" : "pessoas"}`}
+      aberta={aberta}
+      onToggle={onToggle}
+    >
+      {minhasFamilias.length > 1 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ ...styles.panelHint, fontWeight: 600, marginBottom: 6 }}>Trocar de família — você faz parte de mais de uma</div>
+          {minhasFamilias.map((f) => (
+            <div key={f.id} style={styles.listRow}>
+              <div style={styles.listRowMain}>
+                <span>{f.nome}</span>
+                <span style={{ ...styles.panelHint, color: f.ativa ? "var(--q-teal)" : undefined }}>
+                  {f.papel} {f.ativa ? "· ativa agora" : ""}
+                </span>
+              </div>
+              {!f.ativa && (
+                <button className="q-btn" style={styles.buttonGhost} disabled={trocando === f.id} onClick={() => trocarFamilia(f.id)}>
+                  <ArrowLeftRight size={14} />
+                  {trocando === f.id ? "Trocando…" : "Trocar pra essa"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <form onSubmit={salvarNome} style={{ ...styles.formRow, marginBottom: 12 }}>
         <Field label="Nome da família">
@@ -341,7 +379,7 @@ function SecaoFamilia() {
         <LogOut size={14} />
         Sair dessa família
       </button>
-    </section>
+    </Acordeao>
   );
 }
 
@@ -353,6 +391,11 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
   const [buscandoCotacao, setBuscandoCotacao] = useState(false);
   const [mesOverride, setMesOverride] = useState("");
   const [mensagem, setMensagem] = useState<string | null>(null);
+  const [secaoAberta, setSecaoAberta] = useState<SecaoId | null>("familia");
+
+  function alternarSecao(s: SecaoId) {
+    setSecaoAberta((atual) => (atual === s ? null : s));
+  }
 
   useEffect(() => {
     configApi.obter().then((c) => {
@@ -398,11 +441,16 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
 
   return (
     <>
-      <section className="q-surface" style={styles.panel}>
-        <div style={styles.panelHeadRow}>
-          <h3 style={styles.panelTitle}>Renda</h3>
-          <span style={styles.panelHint}>seu salário — se não for em reais, também a cotação usada pra converter</span>
-        </div>
+      <SecaoFamilia aberta={secaoAberta === "familia"} onToggle={() => alternarSecao("familia")} />
+
+      <Acordeao
+        icon={<Banknote size={14} color="var(--q-gold)" />}
+        cor="var(--q-gold)"
+        titulo="Renda"
+        hint={moeda === "BRL" ? "BRL" : `${moeda}${cotacao ? ` · ${cotacao}` : ""}`}
+        aberta={secaoAberta === "renda"}
+        onToggle={() => alternarSecao("renda")}
+      >
         <form onSubmit={salvarConfig}>
           <div style={styles.formRow}>
             <Field label="Moeda do salário">
@@ -441,13 +489,9 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
             Salvar
           </button>
         </form>
-      </section>
+      </Acordeao>
 
-      <SecaoCartoes />
-
-      <SecaoMinhasFamilias />
-
-      <SecaoFamilia />
+      <SecaoCartoes aberta={secaoAberta === "cartoes"} onToggle={() => alternarSecao("cartoes")} />
 
       {mensagem && <div style={styles.panelHint}>{mensagem}</div>}
 
