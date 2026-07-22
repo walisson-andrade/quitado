@@ -4,6 +4,7 @@ import { diffMeses, mesFinalParcelamento, parcelaAindaAtiva, parcelaNoMes } from
 import type { MesReferencia } from "@quitado/shared-types";
 import { fmt, mesLabel } from "../format.js";
 import type { ParcelamentoRow } from "../api/types.js";
+import { BarraProgresso } from "./BarraProgresso.js";
 import { corPorOrigem } from "./OrigemChart.js";
 
 const CORES = ["var(--q-gold)", "var(--q-orange)", "var(--q-teal)", "var(--q-blue)", "var(--q-purple)", "var(--q-rose)"];
@@ -48,38 +49,6 @@ function ordenarPorFim<T extends { mesFim: MesReferencia | null }>(itens: T[]): 
     const fimB = b.mesFim ?? "9999-99";
     return fimA.localeCompare(fimB);
   });
-}
-
-function BarraProgresso({ progresso, cor, indefinido }: { progresso: number; cor: string; indefinido: boolean }) {
-  return (
-    <div style={{ position: "relative", height: 8, background: "var(--q-track-bg)", borderRadius: 4 }}>
-      <div
-        className="q-bar-fill"
-        style={{
-          position: "absolute",
-          left: 0,
-          width: `${progresso}%`,
-          height: "100%",
-          borderRadius: 4,
-          background: cor,
-          backgroundImage: indefinido ? `repeating-linear-gradient(135deg, ${cor} 0 6px, transparent 6px 10px)` : "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: `${progresso}%`,
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-          width: 12,
-          height: 12,
-          borderRadius: "50%",
-          background: cor,
-          border: "2.5px solid var(--q-card-bg)",
-        }}
-      />
-    </div>
-  );
 }
 
 function LinhaDivida({ nome, cor, progresso, faltaCents, mesFim, indefinido }: { nome: string; cor: string; progresso: number; faltaCents: number | null; mesFim: MesReferencia | null; indefinido: boolean }) {

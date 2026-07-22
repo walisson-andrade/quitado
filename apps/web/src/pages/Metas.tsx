@@ -5,6 +5,7 @@ import {
 import { calcularAporteNecessario, calcularProgressoMeta, mesesRestantesMeta } from "@quitado/calc";
 import { configApi, dashboardApi, metasApi } from "../api/resources.js";
 import type { MetaAporteRow, MetaCategoria, MetaRow } from "../api/types.js";
+import { BarraProgresso } from "../components/BarraProgresso.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
 import { fmt, mesLabel } from "../format.js";
@@ -180,11 +181,11 @@ function MetaCard({
           <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={15} color={cor} style={{ flexShrink: 0 }} />
           <div
             style={{
-              width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: "flex",
-              alignItems: "center", justifyContent: "center", background: "var(--q-card-bg)",
+              width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: "flex",
+              alignItems: "center", justifyContent: "center", background: `color-mix(in srgb, ${cor} 16%, transparent)`,
             }}
           >
-            <Icon size={15} color={cor} />
+            <Icon size={16} color={cor} />
           </div>
           <span style={{ flex: 1, minWidth: 0, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {meta.nome}
@@ -198,9 +199,7 @@ function MetaCard({
             {(progresso.percentual * 100).toFixed(0)}%
           </span>
         </div>
-        <div style={styles.progressTrack}>
-          <div style={{ ...styles.progressFill, width: `${Math.min(progresso.percentual, 1) * 100}%`, background: cor }} />
-        </div>
+        <BarraProgresso progresso={Math.min(progresso.percentual, 1) * 100} cor={cor} />
         <div style={{ ...styles.cardFoot, display: "flex", justifyContent: "space-between" }}>
           <span>{fmt(meta.acumuladoCents)} de {fmt(meta.valorAlvoCents)}</span>
           <span>{concluida ? "concluída" : `até ${mesLabel(meta.prazo)}`}</span>

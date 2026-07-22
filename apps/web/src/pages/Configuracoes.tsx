@@ -37,7 +37,7 @@ function Acordeao({
         style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--q-inset-bg)", border: "none", cursor: "pointer", color: "var(--q-text)", textAlign: "left" }}
       >
         <ChevronRight className={`q-chevron${aberta ? " aberto" : ""}`} size={15} color={cor} style={{ flexShrink: 0 }} />
-        <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--q-card-bg)" }}>
+        <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `color-mix(in srgb, ${cor} 16%, transparent)` }}>
           {icon}
         </div>
         <span style={{ flex: 1, minWidth: 0, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
