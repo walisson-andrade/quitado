@@ -1,4 +1,4 @@
-import type { MesReferencia, MetaPoupanca } from "@quitado/shared-types";
+import type { MesReferencia } from "@quitado/shared-types";
 import { diffMeses } from "./mes.js";
 
 export interface ProgressoMeta {
@@ -6,7 +6,14 @@ export interface ProgressoMeta {
   restanteCents: number;
 }
 
-export function calcularProgressoMeta(meta: MetaPoupanca): ProgressoMeta {
+/** Só os campos que o cálculo de progresso realmente usa — uma meta de verdade tem mais (id, nome, categoria...), mas essas funções não precisam saber disso. */
+export interface MetaComProgresso {
+  valorAlvoCents: number;
+  prazo: MesReferencia;
+  acumuladoCents: number;
+}
+
+export function calcularProgressoMeta(meta: MetaComProgresso): ProgressoMeta {
   const percentual = meta.valorAlvoCents === 0 ? 0 : meta.acumuladoCents / meta.valorAlvoCents;
   const restanteCents = Math.max(meta.valorAlvoCents - meta.acumuladoCents, 0);
   return { percentual, restanteCents };
@@ -34,7 +41,7 @@ export function mesesRestantesMeta(
  * negativo (se a meta já foi batida, o aporte necessário é zero).
  */
 export function calcularAporteNecessario(
-  meta: MetaPoupanca,
+  meta: MetaComProgresso,
   mesAtual: MesReferencia,
   mesAtualJaContemplado: boolean,
 ): number {

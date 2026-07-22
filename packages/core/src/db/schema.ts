@@ -247,24 +247,36 @@ export const reembolsos = pgTable("quitado_reembolsos", {
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Meta de poupança — uma por household (era uma linha global fixa `id=1`, agora chaveada por household). */
-export const metaPoupanca = pgTable("quitado_meta_poupanca", {
-  householdId: uuid("household_id")
-    .primaryKey()
-    .references(() => households.id, { onDelete: "cascade" }),
-  valorAlvoCents: integer("valor_alvo_cents").notNull(),
-  prazo: char("prazo", { length: 7 }).notNull(),
-  aporteMensalCents: integer("aporte_mensal_cents").notNull(),
-  acumuladoCents: integer("acumulado_cents").notNull().default(0),
-  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
-});
-
-/** Histórico de aportes guardados por mês — alimenta a tela de histórico e o desconto do aporte no saldo do mês. */
-export const metaPoupancaAportes = pgTable("quitado_meta_poupanca_aportes", {
+/**
+ * Metas de poupança — uma família pode ter várias (viagem, carro, praia...),
+ * cada uma com seu próprio progresso e histórico de aportes. Era uma linha
+ * única por household; virou uma tabela normal com `id` próprio.
+ */
+export const metas = pgTable("quitado_metas", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   householdId: uuid("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
+  nome: text("nome").notNull(),
+  /** 'viagem' | 'carro' | 'casa' | 'educacao' | 'compra' | 'emergencia' | 'outro' — define ícone/cor no frontend. */
+  categoria: text("categoria").notNull().default("outro"),
+  valorAlvoCents: integer("valor_alvo_cents").notNull(),
+  prazo: char("prazo", { length: 7 }).notNull(),
+  aporteMensalCents: integer("aporte_mensal_cents").notNull().default(0),
+  acumuladoCents: integer("acumulado_cents").notNull().default(0),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Histórico de aportes guardados por mês numa meta específica — alimenta a tela de histórico e o desconto do aporte no saldo do mês. */
+export const metaAportes = pgTable("quitado_meta_aportes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  householdId: uuid("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  metaId: uuid("meta_id")
+    .notNull()
+    .references(() => metas.id, { onDelete: "cascade" }),
   mesReferencia: char("mes_referencia", { length: 7 }).notNull(),
   valorCents: integer("valor_cents").notNull(),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),

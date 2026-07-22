@@ -11,7 +11,7 @@ import { Dashboard } from "./pages/Dashboard.js";
 import { Despesas } from "./pages/Despesas.js";
 import { Fatura } from "./pages/Fatura.js";
 import { Login } from "./pages/Login.js";
-import { MetaPoupanca } from "./pages/MetaPoupanca.js";
+import { Metas } from "./pages/Metas.js";
 import { QuemMeDeve } from "./pages/QuemMeDeve.js";
 import { fontImports, styles } from "./styles.js";
 import { useTheme } from "./useTheme.js";
@@ -123,7 +123,7 @@ export default function App() {
           {tab === "devem" && <QuemMeDeve />}
           {tab === "fatura" && <Fatura />}
           {tab === "contas" && <ContasAPagar />}
-          {tab === "meta" && <MetaPoupanca />}
+          {tab === "meta" && <Metas />}
           {tab === "config" && <Configuracoes onLogout={() => setAutenticado(false)} />}
         </div>
       </main>
@@ -134,7 +134,7 @@ export default function App() {
         <NavBtn icon={<Users size={20} />} label="Devem" active={tab === "devem"} onClick={() => setTab("devem")} />
         <NavBtn icon={<Upload size={20} />} label="Fatura" active={tab === "fatura"} onClick={() => setTab("fatura")} />
         <NavBtn icon={<CalendarClock size={20} />} label="Contas" active={tab === "contas"} onClick={() => setTab("contas")} />
-        <NavBtn icon={<Target size={20} />} label="Meta" active={tab === "meta"} onClick={() => setTab("meta")} />
+        <NavBtn icon={<Target size={20} />} label="Metas" active={tab === "meta"} onClick={() => setTab("meta")} />
         <NavBtn icon={<Settings size={20} />} label="Config" active={tab === "config"} onClick={() => setTab("config")} />
       </nav>
     </div>

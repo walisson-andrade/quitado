@@ -13,7 +13,7 @@ import {
   despesasFixas,
   householdConfig,
   itensVariaveis,
-  metaPoupancaAportes,
+  metaAportes,
   parcelamentos,
   parcelasDevedor,
   reembolsos,
@@ -42,7 +42,7 @@ export const obterDashboard: Handler = async ({ db, query, session }) => {
     db.select().from(itensVariaveis).where(eq(itensVariaveis.householdId, householdId)),
     db.select().from(reembolsos).where(eq(reembolsos.householdId, householdId)),
     db.select().from(parcelasDevedor).where(eq(parcelasDevedor.householdId, householdId)),
-    db.select().from(metaPoupancaAportes).where(eq(metaPoupancaAportes.householdId, householdId)),
+    db.select().from(metaAportes).where(eq(metaAportes.householdId, householdId)),
     db
       .select({ id: despesaFixaOverrides.id, despesaFixaId: despesaFixaOverrides.despesaFixaId, mesReferencia: despesaFixaOverrides.mesReferencia, valorCents: despesaFixaOverrides.valorCents })
       .from(despesaFixaOverrides)

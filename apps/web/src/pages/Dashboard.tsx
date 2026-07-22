@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowDownRight, Check, Target, TrendingUp, Wallet } from "lucide-react";
-import { calcularAporteNecessario, calcularProgressoMeta } from "@quitado/calc";
-import { dashboardApi, devedoresApi, metaPoupancaApi, parcelamentosApi } from "../api/resources.js";
-import type { DashboardResponse, DevedorRow, MetaPoupancaRow, ParcelaDevedorRow, ParcelamentoRow } from "../api/types.js";
+import { dashboardApi, devedoresApi, metasApi, parcelamentosApi } from "../api/resources.js";
+import type { DashboardResponse, DevedorRow, MetaRow, ParcelaDevedorRow, ParcelamentoRow } from "../api/types.js";
 import { CategoriaChart } from "../components/CategoriaChart.js";
 import { DespesaChart } from "../components/DespesaChart.js";
 import { GanttTimeline } from "../components/GanttTimeline.js";
@@ -15,23 +14,22 @@ import { styles } from "../styles.js";
 export function Dashboard() {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [parcelamentos, setParcelamentos] = useState<ParcelamentoRow[]>([]);
-  const [meta, setMeta] = useState<MetaPoupancaRow | null>(null);
+  const [metas, setMetas] = useState<MetaRow[]>([]);
   const [devedores, setDevedores] = useState<DevedorRow[]>([]);
   const [parcelasDevedores, setParcelasDevedores] = useState<ParcelaDevedorRow[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [guardandoAporte, setGuardandoAporte] = useState(false);
 
   function carregar() {
     return Promise.all([
       dashboardApi.obter(),
       parcelamentosApi.listar(),
-      metaPoupancaApi.obter(),
+      metasApi.listar(),
       devedoresApi.listar(),
       devedoresApi.listarParcelas(),
     ]).then(([d, p, m, dev, pd]) => {
       setDashboard(d);
       setParcelamentos(p);
-      setMeta(m);
+      setMetas(m);
       setDevedores(dev);
       setParcelasDevedores(pd);
     });
@@ -48,22 +46,10 @@ export function Dashboard() {
 
   if (carregando || !dashboard) return <div style={styles.panelHint}>Carregando...</div>;
 
-  const mesAtual = dashboard.mesAtual;
   const saldo = dashboard.saldoMesAtual;
-  const progressoMeta = meta ? calcularProgressoMeta(meta) : null;
-  const jaGuardadoEsteMesCents = saldo?.aportesMetaCents ?? 0;
-  const aporteSugeridoCents = meta ? calcularAporteNecessario(meta, mesAtual, jaGuardadoEsteMesCents > 0) : null;
-
-  async function guardarAporteSugerido() {
-    if (!aporteSugeridoCents || aporteSugeridoCents <= 0) return;
-    setGuardandoAporte(true);
-    try {
-      await metaPoupancaApi.registrarAporte({ mesReferencia: mesAtual, valorCents: aporteSugeridoCents });
-      await carregar();
-    } finally {
-      setGuardandoAporte(false);
-    }
-  }
+  const guardadoTotalCents = metas.reduce((s, m) => s + m.acumuladoCents, 0);
+  const alvoTotalCents = metas.reduce((s, m) => s + m.valorAlvoCents, 0);
+  const percentualTotal = alvoTotalCents > 0 ? guardadoTotalCents / alvoTotalCents : 0;
 
   const parcelasEsteMes = parcelasDevedores
     .filter((p) => p.status === "pendente" && p.mesReferencia === dashboard.mesAtual)
@@ -122,43 +108,24 @@ export function Dashboard() {
               : "depois de tudo pago"
           }
         />
-        {meta && progressoMeta ? (
+        {metas.length > 0 ? (
           <SummaryCard
             delayMs={180}
-            label={`Meta: ${fmt(meta.valorAlvoCents)}`}
-            value={`${(progressoMeta.percentual * 100).toFixed(1)}%`}
+            label={`${metas.length} ${metas.length === 1 ? "meta" : "metas"}`}
+            value={`${(percentualTotal * 100).toFixed(0)}%`}
             icon={<Target size={18} color="var(--q-purple)" />}
             accent="var(--q-purple)"
-            foot={`precisa guardar ${fmt(aporteSugeridoCents ?? 0)}/mês até ${mesLabel(meta.prazo)}`}
-            progress={Math.min(progressoMeta.percentual, 1)}
-            action={
-              aporteSugeridoCents && aporteSugeridoCents > 0 ? (
-                jaGuardadoEsteMesCents > 0 ? (
-                  <div style={{ ...styles.cardFoot, color: "var(--q-teal)", marginTop: 8 }}>
-                    {fmt(jaGuardadoEsteMesCents)} guardado este mês ✓
-                  </div>
-                ) : (
-                  <button
-                    className="q-btn"
-                    type="button"
-                    onClick={guardarAporteSugerido}
-                    disabled={guardandoAporte}
-                    style={{ ...styles.buttonGhost, marginTop: 8, width: "100%", padding: "6px 10px", fontSize: 11 }}
-                  >
-                    {guardandoAporte ? "Guardando..." : `Guardar ${fmt(aporteSugeridoCents)} este mês`}
-                  </button>
-                )
-              ) : undefined
-            }
+            foot={`${fmt(guardadoTotalCents)} guardado de ${fmt(alvoTotalCents)} no total`}
+            progress={Math.min(percentualTotal, 1)}
           />
         ) : (
           <SummaryCard
             delayMs={180}
-            label="Meta de poupança"
+            label="Metas"
             value="—"
             icon={<Target size={18} color="var(--q-purple)" />}
             accent="var(--q-purple)"
-            foot="configure sua meta na aba correspondente"
+            foot="crie sua primeira meta na aba Metas"
           />
         )}
       </section>

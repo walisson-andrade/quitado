@@ -13,7 +13,8 @@ import type {
   HouseholdRow,
   MembroHousehold,
   MetaAporteRow,
-  MetaPoupancaRow,
+  MetaCategoria,
+  MetaRow,
   MinhaFamilia,
   MoedaSalario,
   ParcelaDevedorRow,
@@ -135,16 +136,20 @@ export const reembolsosApi = {
   remover: (id: string) => api.delete<void>(`/reembolsos/${id}`),
 };
 
-export const metaPoupancaApi = {
-  obter: () => api.get<MetaPoupancaRow | null>("/meta-poupanca"),
-  atualizar: (input: MetaPoupancaRow) => api.put<MetaPoupancaRow>("/meta-poupanca", input),
-  listarAportes: () => api.get<MetaAporteRow[]>("/meta-poupanca/aportes"),
-  registrarAporte: (input: { mesReferencia: string; valorCents: number }) =>
-    api.post<{ aporte: MetaAporteRow; meta: MetaPoupancaRow }>("/meta-poupanca/aportes", input),
-  editarAporte: (id: string, input: Partial<{ mesReferencia: string; valorCents: number }>) =>
-    api.patch<{ aporte: MetaAporteRow; meta: MetaPoupancaRow }>(`/meta-poupanca/aportes/${id}`, input),
-  removerAporte: (id: string) =>
-    api.delete<{ meta: MetaPoupancaRow }>(`/meta-poupanca/aportes/${id}`),
+export const metasApi = {
+  listar: () => api.get<MetaRow[]>("/metas"),
+  criar: (input: { nome: string; categoria: MetaCategoria; valorAlvoCents: number; prazo: string; acumuladoCents?: number }) =>
+    api.post<MetaRow>("/metas", input),
+  atualizar: (id: string, input: Partial<{ nome: string; categoria: MetaCategoria; valorAlvoCents: number; prazo: string; acumuladoCents: number }>) =>
+    api.patch<MetaRow>(`/metas/${id}`, input),
+  remover: (id: string) => api.delete<void>(`/metas/${id}`),
+  listarAportes: (metaId: string) => api.get<MetaAporteRow[]>(`/metas/${metaId}/aportes`),
+  registrarAporte: (metaId: string, input: { mesReferencia: string; valorCents: number }) =>
+    api.post<{ aporte: MetaAporteRow; meta: MetaRow }>(`/metas/${metaId}/aportes`, input),
+  editarAporte: (metaId: string, aporteId: string, input: Partial<{ mesReferencia: string; valorCents: number }>) =>
+    api.patch<{ aporte: MetaAporteRow; meta: MetaRow }>(`/metas/${metaId}/aportes/${aporteId}`, input),
+  removerAporte: (metaId: string, aporteId: string) =>
+    api.delete<{ meta: MetaRow }>(`/metas/${metaId}/aportes/${aporteId}`),
 };
 
 export interface ConfirmarFaturaResponse extends FaturaImportadaRow {

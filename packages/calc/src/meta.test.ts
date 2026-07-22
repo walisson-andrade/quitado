@@ -6,7 +6,6 @@ describe("calcularProgressoMeta", () => {
     const r = calcularProgressoMeta({
       valorAlvoCents: 1_000_000,
       prazo: "2026-12",
-      aporteMensalCents: 166_667,
       acumuladoCents: 166_667,
     });
     expect(r.percentual).toBeCloseTo(0.166667, 5);
@@ -17,7 +16,6 @@ describe("calcularProgressoMeta", () => {
     const r = calcularProgressoMeta({
       valorAlvoCents: 1_000_000,
       prazo: "2026-12",
-      aporteMensalCents: 166_667,
       acumuladoCents: 1_200_000,
     });
     expect(r.restanteCents).toBe(0);
@@ -43,7 +41,7 @@ describe("mesesRestantesMeta", () => {
 describe("calcularAporteNecessario", () => {
   it("R$10.000 faltando, nada guardado ainda, 6 meses restantes (jul..dez) -> R$1.666,67/mês (exemplo do usuário: nada guardado em julho)", () => {
     const aporte = calcularAporteNecessario(
-      { valorAlvoCents: 1_000_000, prazo: "2026-12", aporteMensalCents: 0, acumuladoCents: 0 },
+      { valorAlvoCents: 1_000_000, prazo: "2026-12", acumuladoCents: 0 },
       "2026-07",
       false,
     );
@@ -53,7 +51,7 @@ describe("calcularAporteNecessario", () => {
 
   it("regressão: R$10.000 de meta, R$2.780 já guardados em julho, prazo dez/26 -> R$1.444/mês (exemplo do usuário: julho já contemplado)", () => {
     const aporte = calcularAporteNecessario(
-      { valorAlvoCents: 1_000_000, prazo: "2026-12", aporteMensalCents: 0, acumuladoCents: 278_000 },
+      { valorAlvoCents: 1_000_000, prazo: "2026-12", acumuladoCents: 278_000 },
       "2026-07",
       true,
     );
@@ -63,7 +61,7 @@ describe("calcularAporteNecessario", () => {
 
   it("é zero quando a meta já foi atingida", () => {
     const aporte = calcularAporteNecessario(
-      { valorAlvoCents: 1_000_000, prazo: "2026-12", aporteMensalCents: 0, acumuladoCents: 1_000_000 },
+      { valorAlvoCents: 1_000_000, prazo: "2026-12", acumuladoCents: 1_000_000 },
       "2026-07",
       false,
     );
@@ -72,7 +70,7 @@ describe("calcularAporteNecessario", () => {
 
   it("arredonda para cima (nunca guarda menos que o necessário)", () => {
     const aporte = calcularAporteNecessario(
-      { valorAlvoCents: 1_000_000, prazo: "2026-10", aporteMensalCents: 0, acumuladoCents: 0 },
+      { valorAlvoCents: 1_000_000, prazo: "2026-10", acumuladoCents: 0 },
       "2026-07",
       true,
     );

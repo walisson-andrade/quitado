@@ -1,0 +1,909 @@
+{
+  "id": "3f1aec41-c261-43be-ab3d-9345711be982",
+  "prevId": "844148b4-7e49-4587-a80c-40c1cd6e6c0c",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.quitado_app_config": {
+      "name": "quitado_app_config",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "smallint",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "salario_eur_cents": {
+          "name": "salario_eur_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "eur_brl_rate": {
+          "name": "eur_brl_rate",
+          "type": "numeric(10, 4)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1.0'"
+        },
+        "mes_atual_override": {
+          "name": "mes_atual_override",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_version": {
+          "name": "token_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_cartoes": {
+      "name": "quitado_cartoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dia_vencimento": {
+          "name": "dia_vencimento",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cor_hex": {
+          "name": "cor_hex",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_conta_pagamentos": {
+      "name": "quitado_conta_pagamentos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "despesa_fixa_id": {
+          "name": "despesa_fixa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cartao_id": {
+          "name": "cartao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parcelamento_id": {
+          "name": "parcelamento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mes_referencia": {
+          "name": "mes_referencia",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendente'"
+        },
+        "pago_em": {
+          "name": "pago_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "quitado_conta_pagamentos_despesa_fixa_id_quitado_despesas_fixas_id_fk": {
+          "name": "quitado_conta_pagamentos_despesa_fixa_id_quitado_despesas_fixas_id_fk",
+          "tableFrom": "quitado_conta_pagamentos",
+          "columnsFrom": [
+            "despesa_fixa_id"
+          ],
+          "tableTo": "quitado_despesas_fixas",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "quitado_conta_pagamentos_cartao_id_quitado_cartoes_id_fk": {
+          "name": "quitado_conta_pagamentos_cartao_id_quitado_cartoes_id_fk",
+          "tableFrom": "quitado_conta_pagamentos",
+          "columnsFrom": [
+            "cartao_id"
+          ],
+          "tableTo": "quitado_cartoes",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "quitado_conta_pagamentos_parcelamento_id_quitado_parcelamentos_id_fk": {
+          "name": "quitado_conta_pagamentos_parcelamento_id_quitado_parcelamentos_id_fk",
+          "tableFrom": "quitado_conta_pagamentos",
+          "columnsFrom": [
+            "parcelamento_id"
+          ],
+          "tableTo": "quitado_parcelamentos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "quitado_conta_pagamentos_despesa_fixa_id_mes_referencia_unique": {
+          "name": "quitado_conta_pagamentos_despesa_fixa_id_mes_referencia_unique",
+          "columns": [
+            "despesa_fixa_id",
+            "mes_referencia"
+          ],
+          "nullsNotDistinct": false
+        },
+        "quitado_conta_pagamentos_cartao_id_mes_referencia_unique": {
+          "name": "quitado_conta_pagamentos_cartao_id_mes_referencia_unique",
+          "columns": [
+            "cartao_id",
+            "mes_referencia"
+          ],
+          "nullsNotDistinct": false
+        },
+        "quitado_conta_pagamentos_parcelamento_id_mes_referencia_unique": {
+          "name": "quitado_conta_pagamentos_parcelamento_id_mes_referencia_unique",
+          "columns": [
+            "parcelamento_id",
+            "mes_referencia"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_despesa_fixa_overrides": {
+      "name": "quitado_despesa_fixa_overrides",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "despesa_fixa_id": {
+          "name": "despesa_fixa_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mes_referencia": {
+          "name": "mes_referencia",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_cents": {
+          "name": "valor_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "quitado_despesa_fixa_overrides_despesa_fixa_id_quitado_despesas_fixas_id_fk": {
+          "name": "quitado_despesa_fixa_overrides_despesa_fixa_id_quitado_despesas_fixas_id_fk",
+          "tableFrom": "quitado_despesa_fixa_overrides",
+          "columnsFrom": [
+            "despesa_fixa_id"
+          ],
+          "tableTo": "quitado_despesas_fixas",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "quitado_despesa_fixa_overrides_despesa_fixa_id_mes_referencia_unique": {
+          "name": "quitado_despesa_fixa_overrides_despesa_fixa_id_mes_referencia_unique",
+          "columns": [
+            "despesa_fixa_id",
+            "mes_referencia"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_despesas_fixas": {
+      "name": "quitado_despesas_fixas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_cents": {
+          "name": "valor_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categoria": {
+          "name": "categoria",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "dia_vencimento": {
+          "name": "dia_vencimento",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_devedores": {
+      "name": "quitado_devedores",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cor_hex": {
+          "name": "cor_hex",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_faturas_importadas": {
+      "name": "quitado_faturas_importadas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tipo_origem": {
+          "name": "tipo_origem",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "origem": {
+          "name": "origem",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nome_arquivo": {
+          "name": "nome_arquivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "arquivo_storage_key": {
+          "name": "arquivo_storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "arquivo_hash": {
+          "name": "arquivo_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mes_referencia_sugerido": {
+          "name": "mes_referencia_sugerido",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "titular_sugerido": {
+          "name": "titular_sugerido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "banco_sugerido": {
+          "name": "banco_sugerido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_fatura_sugerido_cents": {
+          "name": "total_fatura_sugerido_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "json_extraido": {
+          "name": "json_extraido",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "json_confirmado": {
+          "name": "json_confirmado",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendente_revisao'"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "confirmado_em": {
+          "name": "confirmado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_itens_variaveis": {
+      "name": "quitado_itens_variaveis",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mes_referencia": {
+          "name": "mes_referencia",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_cents": {
+          "name": "valor_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "quitado_itens_variaveis_nome_mes_referencia_unique": {
+          "name": "quitado_itens_variaveis_nome_mes_referencia_unique",
+          "columns": [
+            "nome",
+            "mes_referencia"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_meta_poupanca": {
+      "name": "quitado_meta_poupanca",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "smallint",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "valor_alvo_cents": {
+          "name": "valor_alvo_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prazo": {
+          "name": "prazo",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "aporte_mensal_cents": {
+          "name": "aporte_mensal_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acumulado_cents": {
+          "name": "acumulado_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_meta_poupanca_aportes": {
+      "name": "quitado_meta_poupanca_aportes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "mes_referencia": {
+          "name": "mes_referencia",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_cents": {
+          "name": "valor_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_parcelamentos": {
+      "name": "quitado_parcelamentos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_parcela_cents": {
+          "name": "valor_parcela_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parcela_atual": {
+          "name": "parcela_atual",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parcela_total": {
+          "name": "parcela_total",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mes_inicio": {
+          "name": "mes_inicio",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "origem": {
+          "name": "origem",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cartao_origem": {
+          "name": "cartao_origem",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "categoria": {
+          "name": "categoria",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "continua_indefinidamente": {
+          "name": "continua_indefinidamente",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "fatura_importada_id": {
+          "name": "fatura_importada_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dia_vencimento": {
+          "name": "dia_vencimento",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "quitado_parcelamentos_fatura_importada_id_quitado_faturas_importadas_id_fk": {
+          "name": "quitado_parcelamentos_fatura_importada_id_quitado_faturas_importadas_id_fk",
+          "tableFrom": "quitado_parcelamentos",
+          "columnsFrom": [
+            "fatura_importada_id"
+          ],
+          "tableTo": "quitado_faturas_importadas",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_parcelas_devedor": {
+      "name": "quitado_parcelas_devedor",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "devedor_id": {
+          "name": "devedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mes_referencia": {
+          "name": "mes_referencia",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_cents": {
+          "name": "valor_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendente'"
+        },
+        "pago_em": {
+          "name": "pago_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "quitado_parcelas_devedor_devedor_id_quitado_devedores_id_fk": {
+          "name": "quitado_parcelas_devedor_devedor_id_quitado_devedores_id_fk",
+          "tableFrom": "quitado_parcelas_devedor",
+          "columnsFrom": [
+            "devedor_id"
+          ],
+          "tableTo": "quitado_devedores",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "quitado_parcelas_devedor_devedor_id_mes_referencia_unique": {
+          "name": "quitado_parcelas_devedor_devedor_id_mes_referencia_unique",
+          "columns": [
+            "devedor_id",
+            "mes_referencia"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.quitado_reembolsos": {
+      "name": "quitado_reembolsos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_cents": {
+          "name": "valor_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mes_referencia": {
+          "name": "mes_referencia",
+          "type": "char(7)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "devedor_id": {
+          "name": "devedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "quitado_reembolsos_devedor_id_quitado_devedores_id_fk": {
+          "name": "quitado_reembolsos_devedor_id_quitado_devedores_id_fk",
+          "tableFrom": "quitado_reembolsos",
+          "columnsFrom": [
+            "devedor_id"
+          ],
+          "tableTo": "quitado_devedores",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -11,7 +11,7 @@ import * as devedoresHandlers from "./handlers/devedores.js";
 import * as faturasHandlers from "./handlers/faturas.js";
 import * as householdHandlers from "./handlers/household.js";
 import * as itensVariaveisHandlers from "./handlers/itensVariaveis.js";
-import * as metaPoupancaHandlers from "./handlers/metaPoupanca.js";
+import * as metasHandlers from "./handlers/metas.js";
 import * as parcelamentosHandlers from "./handlers/parcelamentos.js";
 import * as reembolsosHandlers from "./handlers/reembolsos.js";
 
@@ -151,24 +151,14 @@ export const routes: Route[] = [
     handler: protegida(contaPagamentosHandlers.marcarContaPagamento),
   },
 
-  { method: "GET", pattern: "/meta-poupanca", handler: protegida(metaPoupancaHandlers.obterMetaPoupanca) },
-  { method: "PUT", pattern: "/meta-poupanca", handler: protegida(metaPoupancaHandlers.atualizarMetaPoupanca) },
-  { method: "GET", pattern: "/meta-poupanca/aportes", handler: protegida(metaPoupancaHandlers.listarAportesMeta) },
-  {
-    method: "POST",
-    pattern: "/meta-poupanca/aportes",
-    handler: protegida(metaPoupancaHandlers.registrarAporteMeta),
-  },
-  {
-    method: "PATCH",
-    pattern: "/meta-poupanca/aportes/:id",
-    handler: protegida(metaPoupancaHandlers.editarAporteMeta),
-  },
-  {
-    method: "DELETE",
-    pattern: "/meta-poupanca/aportes/:id",
-    handler: protegida(metaPoupancaHandlers.excluirAporteMeta),
-  },
+  { method: "GET", pattern: "/metas", handler: protegida(metasHandlers.listarMetas) },
+  { method: "POST", pattern: "/metas", handler: protegida(metasHandlers.criarMeta) },
+  { method: "PATCH", pattern: "/metas/:id", handler: protegida(metasHandlers.atualizarMeta) },
+  { method: "DELETE", pattern: "/metas/:id", handler: protegida(metasHandlers.removerMeta) },
+  { method: "GET", pattern: "/metas/:id/aportes", handler: protegida(metasHandlers.listarAportesMeta) },
+  { method: "POST", pattern: "/metas/:id/aportes", handler: protegida(metasHandlers.registrarAporteMeta) },
+  { method: "PATCH", pattern: "/metas/:id/aportes/:aporteId", handler: protegida(metasHandlers.editarAporteMeta) },
+  { method: "DELETE", pattern: "/metas/:id/aportes/:aporteId", handler: protegida(metasHandlers.excluirAporteMeta) },
 
   { method: "GET", pattern: "/faturas", handler: protegida(faturasHandlers.listarFaturas) },
   { method: "POST", pattern: "/faturas", handler: protegida(faturasHandlers.criarFaturaUpload) },

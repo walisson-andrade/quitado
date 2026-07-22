@@ -147,7 +147,14 @@ export const ReembolsoSchema = z.object({
 });
 export type Reembolso = z.infer<typeof ReembolsoSchema>;
 
+export const MetaCategoriaSchema = z.enum(["viagem", "carro", "casa", "educacao", "compra", "emergencia", "outro"]);
+export type MetaCategoria = z.infer<typeof MetaCategoriaSchema>;
+
+/** Uma família pode ter várias metas nomeadas (viagem, carro, praia...) — cada uma acompanha seu próprio progresso. */
 export const MetaPoupancaSchema = z.object({
+  id: z.string().uuid(),
+  nome: z.string().min(1),
+  categoria: MetaCategoriaSchema,
   valorAlvoCents: z.number().int().positive(),
   prazo: MesReferenciaSchema,
   aporteMensalCents: z.number().int().nonnegative(),
@@ -155,14 +162,25 @@ export const MetaPoupancaSchema = z.object({
 });
 export type MetaPoupanca = z.infer<typeof MetaPoupancaSchema>;
 
+export const MetaInputSchema = z.object({
+  nome: z.string().min(1),
+  categoria: MetaCategoriaSchema,
+  valorAlvoCents: z.number().int().positive(),
+  prazo: MesReferenciaSchema,
+  acumuladoCents: z.number().int().nonnegative().optional(),
+});
+export type MetaInput = z.infer<typeof MetaInputSchema>;
+
 export const MetaAporteSchema = z.object({
   id: z.string().uuid(),
+  metaId: z.string().uuid(),
   mesReferencia: MesReferenciaSchema,
   valorCents: z.number().int().positive(),
   criadoEm: z.string(),
 });
 export type MetaAporte = z.infer<typeof MetaAporteSchema>;
 
+// metaId não entra aqui — sempre vem do path param (/metas/:id/aportes), nunca do body.
 export const MetaAporteInputSchema = z.object({
   mesReferencia: MesReferenciaSchema,
   valorCents: z.number().int().positive(),

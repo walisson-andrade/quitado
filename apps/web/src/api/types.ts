@@ -73,7 +73,12 @@ export interface ReembolsoRow {
   devedorId: string | null;
 }
 
-export interface MetaPoupancaRow {
+export type MetaCategoria = "viagem" | "carro" | "casa" | "educacao" | "compra" | "emergencia" | "outro";
+
+export interface MetaRow {
+  id: string;
+  nome: string;
+  categoria: MetaCategoria;
   valorAlvoCents: number;
   prazo: MesReferencia;
   aporteMensalCents: number;
@@ -82,6 +87,7 @@ export interface MetaPoupancaRow {
 
 export interface MetaAporteRow {
   id: string;
+  metaId: string;
   mesReferencia: MesReferencia;
   valorCents: number;
   criadoEm: string;
