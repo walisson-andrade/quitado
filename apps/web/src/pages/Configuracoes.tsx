@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Check, Copy, Pencil, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, LogOut, Pencil, Trash2, UserPlus } from "lucide-react";
 import { authApi, cartoesApi, configApi, householdApi } from "../api/resources.js";
 import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow, MinhaFamilia } from "../api/types.js";
 import { Field } from "../components/Field.js";
@@ -249,6 +249,12 @@ function SecaoFamilia() {
     setConvites((atual) => atual.filter((c) => c.id !== id));
   }
 
+  async function sairDaFamilia() {
+    if (!window.confirm(`Sair de "${household?.nome}"? Você perde acesso a esses dados na hora.`)) return;
+    await householdApi.sair();
+    window.location.href = "/";
+  }
+
   if (!household) return null;
   const souDono = household.membros.find((m) => m.id === meuId)?.papel === "dono";
 
@@ -303,6 +309,15 @@ function SecaoFamilia() {
       >
         <UserPlus size={14} />
         Convidar alguém
+      </button>
+
+      <button
+        className="q-btn"
+        style={{ ...styles.buttonGhost, width: "100%", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "var(--q-orange)" }}
+        onClick={sairDaFamilia}
+      >
+        <LogOut size={14} />
+        Sair dessa família
       </button>
     </section>
   );

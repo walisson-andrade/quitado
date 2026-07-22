@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { assinarSessao, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "../auth/jwt.js";
 import { households, householdInvites, householdMembers, users } from "../db/schema.js";
@@ -115,4 +115,40 @@ export const removerMembro: Handler<unknown, { userId: string }> = async ({ db, 
     .where(and(eq(users.id, params.userId), eq(users.activeHouseholdId, session!.householdId)));
 
   return { status: 204, body: null };
+};
+
+/**
+ * Sai da família ativa por vontade própria — diferente de `removerMembro`
+ * (que exige dono e nunca permite se autoexcluir), aqui é sempre a própria
+ * pessoa saindo. Se ela ainda fizer parte de outra família, a sessão troca
+ * pra essa automaticamente; se não sobrar nenhuma, o cookie é limpo e o
+ * próximo login começa do zero (cria uma família nova).
+ */
+export const sairDaFamilia: Handler = async ({ db, session }) => {
+  await db
+    .delete(householdMembers)
+    .where(and(eq(householdMembers.userId, session!.userId), eq(householdMembers.householdId, session!.householdId)));
+
+  const [outraFamilia] = await db
+    .select()
+    .from(householdMembers)
+    .where(and(eq(householdMembers.userId, session!.userId), ne(householdMembers.householdId, session!.householdId)))
+    .limit(1);
+
+  if (!outraFamilia) {
+    await db.update(users).set({ activeHouseholdId: null }).where(eq(users.id, session!.userId));
+    return {
+      status: 200,
+      body: { ok: true, semFamilia: true },
+      setCookies: [{ name: SESSION_COOKIE_NAME, value: "", maxAgeSeconds: 0 }],
+    };
+  }
+
+  await db.update(users).set({ activeHouseholdId: outraFamilia.householdId }).where(eq(users.id, session!.userId));
+  const token = await assinarSessao({ userId: session!.userId, householdId: outraFamilia.householdId });
+  return {
+    status: 200,
+    body: { ok: true, semFamilia: false },
+    setCookies: [{ name: SESSION_COOKIE_NAME, value: token, maxAgeSeconds: SESSION_MAX_AGE_SECONDS }],
+  };
 };
