@@ -23,7 +23,18 @@ export function SummaryCard({
   return (
     <div className="q-surface q-surface-hover q-rise-in" style={{ ...styles.card, animationDelay: `${delayMs}ms` }}>
       <div style={styles.cardTop}>
-        <span style={styles.cardLabel}>{label}</span>
+        <span
+          style={{
+            ...styles.cardLabel,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+          title={label}
+        >
+          {label}
+        </span>
         <div
           style={{
             width: 30,

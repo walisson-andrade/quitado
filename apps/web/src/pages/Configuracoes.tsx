@@ -391,7 +391,7 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
   const [buscandoCotacao, setBuscandoCotacao] = useState(false);
   const [mesOverride, setMesOverride] = useState("");
   const [mensagem, setMensagem] = useState<string | null>(null);
-  const [secaoAberta, setSecaoAberta] = useState<SecaoId | null>("familia");
+  const [secaoAberta, setSecaoAberta] = useState<SecaoId | null>(null);
 
   function alternarSecao(s: SecaoId) {
     setSecaoAberta((atual) => (atual === s ? null : s));

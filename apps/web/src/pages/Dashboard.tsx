@@ -111,7 +111,7 @@ export function Dashboard() {
         {metas.length > 0 ? (
           <SummaryCard
             delayMs={180}
-            label={`${metas.length} ${metas.length === 1 ? "meta" : "metas"}`}
+            label={metas.length <= 2 ? metas.map((m) => m.nome).join(" · ") : `${metas.length} metas`}
             value={`${(percentualTotal * 100).toFixed(0)}%`}
             icon={<Target size={18} color="var(--q-purple)" />}
             accent="var(--q-purple)"
