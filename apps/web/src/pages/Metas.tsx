@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Car, GraduationCap, Home, Pencil, Plane, Plus, ShieldAlert, ShoppingBag, Target, Trash2, X,
 } from "lucide-react";
@@ -226,7 +227,7 @@ function MetaSheet({
     onMudou();
   }
 
-  return (
+  return createPortal(
     <div
       style={{
         position: "fixed", inset: 0, background: "var(--q-scrim, rgba(5,8,16,0.65))",
@@ -380,7 +381,8 @@ function MetaSheet({
           ))
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
