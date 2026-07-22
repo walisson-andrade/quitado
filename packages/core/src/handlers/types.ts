@@ -4,6 +4,7 @@ import type { Db } from "../db/client.js";
 export interface SessaoAtual {
   userId: string;
   householdId: string;
+  papel: string;
 }
 
 export interface HandlerContext<TBody = unknown, TParams = Record<string, string>> {

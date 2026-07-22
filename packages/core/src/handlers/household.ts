@@ -92,10 +92,13 @@ export const aceitarConvite: Handler<unknown, { token: string }> = async ({ db, 
   };
 };
 
-/** Remove alguém da família — qualquer membro pode remover outro, mas não a si mesmo (evita se autoexcluir sem querer no meio do uso). */
+/** Remove alguém da família — só o dono pode remover, e nunca a si mesmo (evita se autoexcluir sem querer no meio do uso). */
 export const removerMembro: Handler<unknown, { userId: string }> = async ({ db, params, session }) => {
+  if (session!.papel !== "dono") {
+    throw new HttpError(403, "Só o dono da família pode remover membros.");
+  }
   if (params.userId === session!.userId) {
-    throw new HttpError(400, "Você não pode remover a si mesmo — peça pra outro membro fazer isso.");
+    throw new HttpError(400, "Você não pode remover a si mesmo — peça pra outro dono fazer isso.");
   }
   const [row] = await db
     .delete(householdMembers)

@@ -177,6 +177,6 @@ export function withAuth<TBody, TParams extends Record<string, string>, TResult>
       .limit(1);
     if (!membro) throw new HttpError(401, "Sessão expirada — faça login novamente");
 
-    return handler({ ...ctx, session: { userId: sessao.userId, householdId: sessao.householdId } });
+    return handler({ ...ctx, session: { userId: sessao.userId, householdId: sessao.householdId, papel: membro.papel } });
   };
 }

@@ -250,6 +250,7 @@ function SecaoFamilia() {
   }
 
   if (!household) return null;
+  const souDono = household.membros.find((m) => m.id === meuId)?.papel === "dono";
 
   return (
     <section className="q-surface" style={styles.panel}>
@@ -275,7 +276,7 @@ function SecaoFamilia() {
               {membro.email} · {membro.papel}
             </span>
           </div>
-          {membro.id !== meuId && (
+          {souDono && membro.id !== meuId && (
             <div style={styles.listRowActions}>
               <button
                 className="q-btn"
