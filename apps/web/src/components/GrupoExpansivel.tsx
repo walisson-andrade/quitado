@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import { fmt } from "../format.js";
 import { styles } from "../styles.js";
+import { IconBadge } from "./IconBadge.js";
 
 export function GrupoExpansivel({
   titulo,
   totalCents,
   quantidadeItens,
   corAccent,
+  icon,
   abertoPorPadrao,
   renderHeader,
   children,
@@ -16,6 +18,7 @@ export function GrupoExpansivel({
   totalCents?: number;
   quantidadeItens?: number;
   corAccent: string;
+  icon?: LucideIcon;
   abertoPorPadrao?: boolean;
   renderHeader?: (aberto: boolean) => React.ReactNode;
   children: React.ReactNode;
@@ -23,7 +26,7 @@ export function GrupoExpansivel({
   const [aberto, setAberto] = useState(abertoPorPadrao ?? false);
 
   return (
-    <div className="q-surface" style={{ marginBottom: 10, border: "1px solid var(--q-border)", borderRadius: 12, overflow: "hidden" }}>
+    <div className="q-surface" style={{ marginBottom: 10, border: "1px solid var(--q-border)", borderRadius: 14, overflow: "hidden" }}>
       <button
         className="q-btn"
         onClick={() => setAberto((a) => !a)}
@@ -32,6 +35,7 @@ export function GrupoExpansivel({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: 10,
           padding: "12px 14px",
           background: "var(--q-inset-bg)",
           border: "none",
@@ -44,14 +48,15 @@ export function GrupoExpansivel({
           renderHeader(aberto)
         ) : (
           <>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={16} color={corAccent} />
-              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+              {icon && <IconBadge icon={icon} cor={corAccent} tamanho="sm" />}
+              <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={16} color={corAccent} style={{ flexShrink: 0 }} />
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {titulo}
               </span>
-              <span style={styles.panelHint}>({quantidadeItens} {quantidadeItens === 1 ? "item" : "itens"})</span>
+              <span style={{ ...styles.panelHint, flexShrink: 0 }}>({quantidadeItens} {quantidadeItens === 1 ? "item" : "itens"})</span>
             </span>
-            <span style={{ ...styles.parcelaValor, color: corAccent, fontSize: "var(--fs-body)" }}>{fmt(totalCents ?? 0)}</span>
+            <span style={{ ...styles.parcelaValor, color: corAccent, fontSize: "var(--fs-body)", flexShrink: 0 }}>{fmt(totalCents ?? 0)}</span>
           </>
         )}
       </button>

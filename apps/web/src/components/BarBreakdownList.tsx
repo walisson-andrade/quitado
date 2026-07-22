@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import { fmt } from "../format.js";
 import { styles } from "../styles.js";
+import { IconBadge } from "./IconBadge.js";
 
 export interface BarBreakdownItemDetalhe {
   nome: string;
@@ -13,6 +14,7 @@ export interface BarBreakdownItem {
   label: string;
   totalCents: number;
   cor: string;
+  icon?: LucideIcon;
   itens?: BarBreakdownItemDetalhe[];
 }
 
@@ -37,14 +39,19 @@ export function BarBreakdownList({
   const somaTotal = itens.reduce((s, i) => s + i.totalCents, 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
       {itens.map((item, i) => {
         const expandivel = !!item.itens && item.itens.length > 0;
         const estaAberto = aberto === item.key;
         const itensOrdenados = item.itens ? [...item.itens].sort((a, b) => b.valorCents - a.valorCents) : [];
+        const pct = maiorTotal > 0 ? (item.totalCents / maiorTotal) * 100 : 0;
 
         return (
-          <div key={item.key}>
+          <div
+            key={item.key}
+            className="q-surface"
+            style={{ background: "var(--q-card-bg)", border: "1px solid var(--q-border)", borderRadius: 14, padding: "11px 12px" }}
+          >
             <button
               className="q-btn"
               type="button"
@@ -55,67 +62,74 @@ export function BarBreakdownList({
                 border: "none",
                 padding: 0,
                 display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 4,
+                alignItems: "center",
+                gap: 9,
                 cursor: expandivel ? "pointer" : "default",
                 color: "inherit",
                 textAlign: "left",
               }}
               disabled={!expandivel}
             >
-              <span style={{ fontSize: "var(--fs-sm)", color: "var(--q-text-secondary)", display: "flex", alignItems: "center", gap: 4 }}>
-                {expandivel && <ChevronRight className={`q-chevron${estaAberto ? " aberto" : ""}`} size={12} />}
-                {item.label}
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ ...styles.parcelaValor }}>{fmt(item.totalCents)}</span>
-                {mostrarPercentual && (
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: "var(--fs-xs)",
-                      color: "var(--q-text-muted)",
-                      width: 34,
-                      textAlign: "right",
-                    }}
-                  >
-                    {somaTotal > 0 ? Math.round((item.totalCents / somaTotal) * 100) : 0}%
-                  </span>
-                )}
-              </span>
-            </button>
-            <div style={{ position: "relative", height: 8, background: "var(--q-track-bg)", borderRadius: 4 }}>
-              <div
-                className="q-bar-fill"
-                style={{
-                  height: "100%",
-                  width: `${(item.totalCents / maiorTotal) * 100}%`,
-                  background: item.cor,
-                  borderRadius: 4,
-                  animationDelay: `${i * 60}ms`,
-                }}
-              />
-              {mostrarMarcadorFim && (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${(item.totalCents / maiorTotal) * 100}%`,
-                    top: "50%",
-                    transform: "translate(-50%, -50%)",
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    background: item.cor,
-                    border: "2.5px solid var(--q-card-bg)",
-                  }}
-                />
+              {item.icon && <IconBadge icon={item.icon} cor={item.cor} tamanho="sm" />}
+              {expandivel && (
+                <ChevronRight className={`q-chevron${estaAberto ? " aberto" : ""}`} size={13} style={{ flexShrink: 0, color: "var(--q-text-faint)" }} />
               )}
-            </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.label}
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <span style={styles.parcelaValor}>{fmt(item.totalCents)}</span>
+                    {mostrarPercentual && (
+                      <span
+                        style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: "var(--fs-xs)",
+                          color: "var(--q-text-muted)",
+                          width: 34,
+                          textAlign: "right",
+                        }}
+                      >
+                        {somaTotal > 0 ? Math.round((item.totalCents / somaTotal) * 100) : 0}%
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div style={{ position: "relative", height: 6, background: "var(--q-track-bg)", borderRadius: 3, marginTop: 6 }}>
+                  <div
+                    className="q-bar-fill"
+                    style={{
+                      height: "100%",
+                      width: `${pct}%`,
+                      background: item.cor,
+                      borderRadius: 3,
+                      animationDelay: `${i * 60}ms`,
+                    }}
+                  />
+                  {mostrarMarcadorFim && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${pct}%`,
+                        top: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: 11,
+                        height: 11,
+                        borderRadius: "50%",
+                        background: item.cor,
+                        border: "2.5px solid var(--q-card-bg)",
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            </button>
             {expandivel && (
               <div className={`q-expand${estaAberto ? " aberto" : ""}`}>
-                <div style={{ padding: estaAberto ? "8px 4px 2px" : "0 4px", display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ padding: estaAberto ? "9px 0 0" : "0", display: "flex", flexDirection: "column", gap: 6 }}>
                   {itensOrdenados.map((detalhe, idx) => (
-                    <div key={`${detalhe.nome}-${idx}`} style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div key={`${detalhe.nome}-${idx}`} style={{ display: "flex", justifyContent: "space-between", paddingLeft: item.icon ? 35 : 0 }}>
                       <span style={{ ...styles.panelHint, color: "var(--q-text-detail)" }}>{detalhe.nome}</span>
                       <span style={{ fontSize: "var(--fs-xs)", fontFamily: "'JetBrains Mono', monospace", color: "var(--q-text-secondary)" }}>
                         {fmt(detalhe.valorCents)}

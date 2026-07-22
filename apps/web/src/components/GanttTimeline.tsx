@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ChevronRight, CreditCard, Layers } from "lucide-react";
+import { ChevronRight, CreditCard, Home, Layers } from "lucide-react";
 import { diffMeses, mesFinalParcelamento, parcelaAindaAtiva, parcelaNoMes } from "@quitado/calc";
 import type { MesReferencia } from "@quitado/shared-types";
 import { fmt, mesLabel } from "../format.js";
 import type { ParcelamentoRow } from "../api/types.js";
 import { BarraProgresso } from "./BarraProgresso.js";
+import { IconBadge } from "./IconBadge.js";
 import { corPorOrigem } from "./OrigemChart.js";
 
 const CORES = ["var(--q-gold)", "var(--q-orange)", "var(--q-teal)", "var(--q-blue)", "var(--q-purple)", "var(--q-rose)"];
@@ -203,7 +204,7 @@ export function GanttTimeline({ meses, parcelamentos }: { meses: MesReferencia[]
         {gruposComProgresso.map((g) => {
           const aberto = cartaoAberto === g.origem;
           return (
-            <div key={g.origem} className="q-surface" style={{ border: "1px solid var(--q-border)", borderRadius: 12, overflow: "hidden" }}>
+            <div key={g.origem} className="q-surface" style={{ border: "1px solid var(--q-border)", borderRadius: 14, overflow: "hidden" }}>
               <button
                 className="q-btn"
                 onClick={() => setCartaoAberto(aberto ? null : g.origem)}
@@ -211,7 +212,7 @@ export function GanttTimeline({ meses, parcelamentos }: { meses: MesReferencia[]
                   width: "100%",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 6,
+                  gap: 8,
                   padding: "12px 14px",
                   background: "var(--q-inset-bg)",
                   border: "none",
@@ -221,7 +222,8 @@ export function GanttTimeline({ meses, parcelamentos }: { meses: MesReferencia[]
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flexWrap: "wrap" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, flexWrap: "wrap" }}>
+                    <IconBadge icon={g.origem === "fixo" ? Home : CreditCard} cor={g.cor} tamanho="sm" />
                     <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={15} color={g.cor} style={{ flexShrink: 0 }} />
                     <span
                       style={{

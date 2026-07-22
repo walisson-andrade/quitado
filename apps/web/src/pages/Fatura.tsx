@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Sparkles, Trash2, Upload } from "lucide-react";
+import { Check, FileText, Sparkles, Trash2, Upload } from "lucide-react";
 import { CATEGORIA_LABEL, categorizarAutomaticamente, resolverMesAtual } from "@quitado/calc";
 import type { ItemFaturaStaged } from "@quitado/shared-types";
 import { cartoesApi, faturasApi } from "../api/resources.js";
 import { ApiError } from "../api/client.js";
 import type { CartaoRow, FaturaImportadaRow } from "../api/types.js";
+import { corDaCategoria, iconeDaCategoria } from "../categoriaVisual.js";
 import { Field } from "../components/Field.js";
+import { IconBadge } from "../components/IconBadge.js";
 import { MesInput } from "../components/MesInput.js";
+import { corPorOrigem } from "../components/OrigemChart.js";
 import { fmt } from "../format.js";
 import { styles } from "../styles.js";
 
@@ -162,6 +165,12 @@ export function Fatura() {
     pendente_revisao: "pendente de revisão",
     confirmado: "confirmada",
     descartado: "descartada",
+  };
+  const STATUS_COR: Record<FaturaImportadaRow["status"], string> = {
+    processando: "var(--q-purple)",
+    pendente_revisao: "var(--q-gold)",
+    confirmado: "var(--q-teal)",
+    descartado: "var(--q-text-faint)",
   };
 
   useEffect(() => {
@@ -377,10 +386,15 @@ export function Fatura() {
           </div>
         )}
 
-        {itens.map((item, idx) => (
+        {itens.map((item, idx) => {
+          const categoriaSlug = categorizarAutomaticamente(item.nome);
+          return (
           <div key={idx} style={{ ...styles.listRow, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input type="checkbox" checked={item.incluido} onChange={(e) => atualizarItem(idx, { incluido: e.target.checked })} />
+              <div style={{ opacity: item.incluido ? 1 : 0.5 }}>
+                <IconBadge icon={iconeDaCategoria(categoriaSlug)} cor={corDaCategoria(categoriaSlug)} tamanho="sm" />
+              </div>
               <input
                 value={item.nome}
                 onChange={(e) => atualizarItem(idx, { nome: e.target.value })}
@@ -454,10 +468,11 @@ export function Fatura() {
                 </span>
               )}
               {item.cartaoOrigem && <span style={styles.panelHint}>· {item.cartaoOrigem}</span>}
-              <span style={styles.panelHint}>· {CATEGORIA_LABEL[categorizarAutomaticamente(item.nome)]}</span>
+              <span style={styles.panelHint}>· {CATEGORIA_LABEL[categoriaSlug]}</span>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
           <button className="q-btn" style={styles.buttonGhost} onClick={descartar} disabled={confirmando}>
@@ -497,7 +512,7 @@ export function Fatura() {
       <div style={styles.dropzone} onClick={() => inputRef.current?.click()}>
         {estado === "idle" && (
           <>
-            <Upload size={28} color="var(--q-text-muted)" />
+            <IconBadge icon={Upload} cor="var(--q-purple)" tamanho="lg" />
             <div style={styles.dropTitle}>Solte o PDF/foto da fatura ou CSV aqui</div>
             <div style={styles.dropSub}>Inter, Nubank, boleto — qualquer formato</div>
           </>
@@ -528,16 +543,23 @@ export function Fatura() {
 
       {pendentes.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={styles.panelHint}>Pendentes de revisão</div>
+          <div style={{ ...styles.panelHint, marginBottom: 8 }}>Pendentes de revisão</div>
           {pendentes.map((f) => (
             <button
-        className="q-btn"
+              className="q-btn q-surface"
               key={f.id}
               onClick={() => abrirRevisao(f)}
-              style={{ ...styles.listRow, width: "100%", background: "none", border: "none", cursor: "pointer", color: "var(--q-text)" }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                background: "var(--q-card-bg)", border: "1px solid var(--q-border)", borderRadius: 14,
+                padding: "11px 13px", marginBottom: 8, cursor: "pointer", color: "var(--q-text)", textAlign: "left",
+              }}
             >
-              <span>{f.nomeArquivo}</span>
-              <Check size={14} color="var(--q-text-muted)" />
+              <IconBadge icon={FileText} cor={corPorOrigem(f.origem ?? "manual")} tamanho="md" />
+              <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: "var(--fs-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {f.nomeArquivo}
+              </span>
+              <Check size={14} color="var(--q-text-muted)" style={{ flexShrink: 0 }} />
             </button>
           ))}
         </div>
@@ -547,14 +569,32 @@ export function Fatura() {
         <div style={{ marginTop: 16 }}>
           <div style={styles.panelHint}>Faturas importadas</div>
           {todasFaturas.map((f) => (
-            <div key={f.id} style={{ ...styles.listRow, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+            <div
+              key={f.id}
+              className="q-surface"
+              style={{
+                display: "flex", flexDirection: "column", gap: 6,
+                background: "var(--q-card-bg)", border: "1px solid var(--q-border)", borderRadius: 14,
+                padding: "11px 13px", marginBottom: 8,
+              }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                <div style={styles.listRowMain}>
-                  <span>{f.nomeArquivo}</span>
-                  <span style={styles.panelHint}>
-                    {f.origem ?? "sem origem"} · {STATUS_LABEL[f.status]}
-                  </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <IconBadge icon={FileText} cor={corPorOrigem(f.origem ?? "manual")} tamanho="md" />
+                  <div style={styles.listRowMain}>
+                    <span>{f.nomeArquivo}</span>
+                    <span style={styles.panelHint}>{f.origem ?? "sem origem"}</span>
+                  </div>
                 </div>
+                <span
+                  style={{
+                    fontSize: "var(--fs-tiny)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em",
+                    color: STATUS_COR[f.status], border: `1px solid ${STATUS_COR[f.status]}`, borderRadius: 6,
+                    padding: "2px 6px", flexShrink: 0,
+                  }}
+                >
+                  {STATUS_LABEL[f.status]}
+                </span>
                 {confirmarRemocaoId !== f.id && (
                   <button
                     className="q-btn"

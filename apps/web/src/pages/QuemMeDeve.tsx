@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronRight, Clock } from "lucide-react";
+import { Check, CheckCircle, ChevronRight, Clock, Plus } from "lucide-react";
 import { resolverMesAtual } from "@quitado/calc";
 import { devedoresApi } from "../api/resources.js";
 import type { DevedorRow, ParcelaDevedorRow } from "../api/types.js";
+import { BarraProgresso } from "../components/BarraProgresso.js";
 import { Field } from "../components/Field.js";
+import { IconBadge } from "../components/IconBadge.js";
 import { MesInput } from "../components/MesInput.js";
 import { fmt, mesLabel } from "../format.js";
 import { styles } from "../styles.js";
@@ -14,7 +16,6 @@ const PREVIEW_COUNT = 4;
 export function QuemMeDeve() {
   const [devedores, setDevedores] = useState<DevedorRow[]>([]);
   const [parcelas, setParcelas] = useState<ParcelaDevedorRow[]>([]);
-  const [novoNome, setNovoNome] = useState("");
   const [carregando, setCarregando] = useState(true);
   const mesAtual = resolverMesAtual(null);
 
@@ -29,14 +30,6 @@ export function QuemMeDeve() {
 
   useEffect(carregar, []);
 
-  async function adicionarDevedor(e: React.FormEvent) {
-    e.preventDefault();
-    if (!novoNome.trim()) return;
-    await devedoresApi.criar({ nome: novoNome.trim() });
-    setNovoNome("");
-    carregar();
-  }
-
   async function alternarPago(parcela: ParcelaDevedorRow) {
     await devedoresApi.marcarParcela(parcela.id, parcela.status === "pago" ? "pendente" : "pago");
     carregar();
@@ -50,51 +43,102 @@ export function QuemMeDeve() {
     .reduce((acc, p) => acc + p.valorCents, 0);
 
   return (
-    <section className="q-surface" style={styles.panel}>
-      <div style={styles.panelHeadRow}>
-        <h3 style={styles.panelTitle}>Quem me deve</h3>
-        <span style={styles.panelHint}>marca como pago quando cair na conta</span>
-      </div>
-
-      <div style={styles.devedoresSummaryRow}>
-        <div style={styles.devedoresSummaryBox}>
-          <div style={styles.devedoresSummaryLabel}>pendente total</div>
-          <div style={{ ...styles.devedoresSummaryValue, color: "var(--q-orange)" }}>{fmt(totalPendente)}</div>
+    <>
+      <section className="q-surface" style={styles.panel}>
+        <div style={styles.panelHeadRow}>
+          <h3 style={styles.panelTitle}>Quem me deve</h3>
+          <span style={styles.panelHint}>marca como pago quando cair na conta</span>
         </div>
-        <div style={styles.devedoresSummaryBox}>
-          <div style={styles.devedoresSummaryLabel}>recebido em {mesLabel(mesAtual)}</div>
-          <div style={{ ...styles.devedoresSummaryValue, color: "var(--q-teal)" }}>{fmt(recebidoNoMes)}</div>
+
+        <div style={styles.devedoresSummaryRow}>
+          <div style={{ ...styles.devedoresSummaryBox, borderRadius: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+              <div style={styles.devedoresSummaryLabel}>pendente total</div>
+              <IconBadge icon={Clock} cor="var(--q-orange)" tamanho="sm" />
+            </div>
+            <div style={{ ...styles.devedoresSummaryValue, color: "var(--q-orange)" }}>{fmt(totalPendente)}</div>
+          </div>
+          <div style={{ ...styles.devedoresSummaryBox, borderRadius: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+              <div style={styles.devedoresSummaryLabel}>recebido em {mesLabel(mesAtual)}</div>
+              <IconBadge icon={CheckCircle} cor="var(--q-teal)" tamanho="sm" />
+            </div>
+            <div style={{ ...styles.devedoresSummaryValue, color: "var(--q-teal)" }}>{fmt(recebidoNoMes)}</div>
+          </div>
         </div>
+      </section>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {devedores.map((dev, i) => {
+          const parcelasDoDevedor = parcelas
+            .filter((p) => p.devedorId === dev.id)
+            .sort((a, b) => a.mesReferencia.localeCompare(b.mesReferencia));
+          const cor = dev.corHex ?? CORES[i % CORES.length]!;
+
+          return (
+            <DevedorCard
+              key={dev.id}
+              devedor={dev}
+              cor={cor}
+              parcelas={parcelasDoDevedor}
+              mesAtual={mesAtual}
+              onTogglePago={alternarPago}
+              onParcelaAdicionada={carregar}
+            />
+          );
+        })}
+
+        <AdicionarPessoa onAdicionada={carregar} />
       </div>
+    </>
+  );
+}
 
-      {devedores.map((dev, i) => {
-        const parcelasDoDevedor = parcelas
-          .filter((p) => p.devedorId === dev.id)
-          .sort((a, b) => a.mesReferencia.localeCompare(b.mesReferencia));
-        const cor = dev.corHex ?? CORES[i % CORES.length]!;
+function AdicionarPessoa({ onAdicionada }: { onAdicionada: () => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
 
-        return (
-          <DevedorCard
-            key={dev.id}
-            devedor={dev}
-            cor={cor}
-            parcelas={parcelasDoDevedor}
-            mesAtual={mesAtual}
-            onTogglePago={alternarPago}
-            onParcelaAdicionada={carregar}
-          />
-        );
-      })}
+  async function adicionar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!novoNome.trim()) return;
+    await devedoresApi.criar({ nome: novoNome.trim() });
+    setNovoNome("");
+    setAberto(false);
+    onAdicionada();
+  }
 
-      <form onSubmit={adicionarDevedor} style={styles.addPersonRow}>
-        <Field label="Nova pessoa">
-          <input placeholder="ex: Wesley" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} style={styles.input} />
-        </Field>
-        <button className="q-btn" type="submit" style={styles.buttonGhost}>
+  if (!aberto) {
+    return (
+      <button
+        className="q-btn"
+        onClick={() => setAberto(true)}
+        style={{
+          border: "1.5px dashed var(--q-border-input)", borderRadius: 16, padding: 14,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          color: "var(--q-text-muted)", fontWeight: 600, fontSize: "var(--fs-sm)",
+          background: "transparent", cursor: "pointer", width: "100%",
+        }}
+      >
+        <Plus size={15} />
+        Nova pessoa
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={adicionar} className="q-surface" style={{ ...styles.panel, padding: 14, borderRadius: 16, marginBottom: 0 }}>
+      <Field label="Nome">
+        <input placeholder="ex: Wesley" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} style={styles.input} autoFocus />
+      </Field>
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button className="q-btn" type="button" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setAberto(false)}>
+          Cancelar
+        </button>
+        <button className="q-btn" type="submit" style={{ ...styles.button, flex: 1 }}>
           Adicionar
         </button>
-      </form>
-    </section>
+      </div>
+    </form>
   );
 }
 
@@ -127,7 +171,7 @@ function DevedorCard({
   const parcelasExibidas = expandido ? parcelas : parcelasPreview;
 
   return (
-    <div style={styles.devedorCard}>
+    <div className="q-surface" style={{ ...styles.devedorCard, borderRadius: 16 }}>
       <button className="q-btn" onClick={() => setAberto((v) => !v)} style={styles.devedorCardHead}>
         <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={16} color={cor} />
@@ -142,13 +186,13 @@ function DevedorCard({
         </span>
       </button>
 
-      <div className={`q-expand${aberto ? " aberto" : ""}`}>
-        <div style={{ paddingTop: aberto ? 12 : 0, overflow: "hidden" }}>
-          <div style={styles.progressTrack}>
-            <div className="q-bar-fill" style={{ ...styles.progressFill, width: `${progresso * 100}%`, background: cor }} />
-          </div>
+      <div style={{ marginTop: 10 }}>
+        <BarraProgresso progresso={progresso * 100} cor={cor} />
+      </div>
 
-          <div style={{ ...styles.parcelasGrid, marginTop: 10 }}>
+      <div className={`q-expand${aberto ? " aberto" : ""}`}>
+        <div style={{ paddingTop: aberto ? 10 : 0, overflow: "hidden" }}>
+          <div style={{ ...styles.parcelasGrid, marginTop: 0 }}>
             {parcelasExibidas.map((parcela) => {
               const isPago = parcela.status === "pago";
               const isProximo = !isPago && parcela.id === parcelas[proximoIdx]?.id;

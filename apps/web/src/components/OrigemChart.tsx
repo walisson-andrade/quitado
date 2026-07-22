@@ -1,3 +1,4 @@
+import { CreditCard, Home } from "lucide-react";
 import { BarBreakdownList } from "./BarBreakdownList.js";
 import type { OrigemTotal } from "../api/types.js";
 
@@ -36,6 +37,7 @@ export function OrigemChart({ porOrigem }: { porOrigem: OrigemTotal[] }) {
         label: o.label,
         totalCents: o.totalCents,
         cor: corPorOrigem(o.origem),
+        icon: o.origem === "fixo" ? Home : CreditCard,
         itens: o.itens,
       }))}
     />

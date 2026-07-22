@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Coins, Pencil, Trash2 } from "lucide-react";
+import { Coins, CreditCard, Home, Pencil, Plus, Trash2 } from "lucide-react";
 import { CATEGORIA_LABEL, categorizarAutomaticamente, parcelamentoContaNoMes, resolverMesAtual } from "@quitado/calc";
 import { cartoesApi, configApi, despesaFixaOverridesApi, despesasFixasApi, faturasApi, parcelamentosApi } from "../api/resources.js";
 import type { CartaoRow, DespesaFixaOverrideRow, DespesaFixaRow, ParcelamentoRow } from "../api/types.js";
+import { corDaCategoria, iconeDaCategoria } from "../categoriaVisual.js";
 import { CategoriaSelect } from "../components/CategoriaSelect.js";
 import { Field } from "../components/Field.js";
+import { IconBadge } from "../components/IconBadge.js";
 import { MesInput } from "../components/MesInput.js";
 import { corPorOrigem } from "../components/OrigemChart.js";
 import { GrupoExpansivel } from "../components/GrupoExpansivel.js";
@@ -122,8 +124,11 @@ function LinhaParcelamento({
     );
   }
 
+  const categoriaSlug = item.categoria ?? categorizarAutomaticamente(item.nome);
+
   return (
-    <div style={styles.listRow}>
+    <div style={{ ...styles.listRow, gap: 10 }}>
+      <IconBadge icon={iconeDaCategoria(categoriaSlug)} cor={corDaCategoria(categoriaSlug)} tamanho="sm" />
       <div style={styles.listRowMain}>
         <span>
           {item.nome}
@@ -216,18 +221,23 @@ function LinhaDespesaFixa({
     );
   }
 
+  const categoriaSlug = item.categoria ?? categorizarAutomaticamente(item.nome);
+
   return (
     <div style={{ ...styles.listRow, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={styles.listRowMain}>
-          <span>
-            {item.nome}
-            {item.diaVencimento && <span style={styles.panelHint}> · dia {item.diaVencimento}</span>}
-          </span>
-          <span style={{ ...styles.parcelaValor, color: override ? "var(--q-orange)" : undefined }}>
-            {fmt(override ? override.valorCents : item.valorCents)}
-            {override && <span style={styles.panelHint}> · personalizado esse mês (normal {fmt(item.valorCents)})</span>}
-          </span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <IconBadge icon={iconeDaCategoria(categoriaSlug)} cor={corDaCategoria(categoriaSlug)} tamanho="sm" />
+          <div style={styles.listRowMain}>
+            <span>
+              {item.nome}
+              {item.diaVencimento && <span style={styles.panelHint}> · dia {item.diaVencimento}</span>}
+            </span>
+            <span style={{ ...styles.parcelaValor, color: override ? "var(--q-orange)" : undefined }}>
+              {fmt(override ? override.valorCents : item.valorCents)}
+              {override && <span style={styles.panelHint}> · personalizado esse mês (normal {fmt(item.valorCents)})</span>}
+            </span>
+          </div>
         </div>
         <div style={styles.listRowActions}>
           <CategoriaMiniSelect nome={item.nome} valor={item.categoria} onChange={onMudarCategoria} />
@@ -397,7 +407,7 @@ export function Despesas() {
           const itens = itensPorOrigem.get(origem)!;
           const total = itens.reduce((acc, p) => acc + p.valorParcelaCents, 0);
           return (
-            <GrupoExpansivel key={origem} titulo={`Fatura ${origem}`} totalCents={total} quantidadeItens={itens.length} corAccent={corPorOrigem(origem)}>
+            <GrupoExpansivel key={origem} titulo={`Fatura ${origem}`} totalCents={total} quantidadeItens={itens.length} corAccent={corPorOrigem(origem)} icon={CreditCard}>
               <GrupoDeCompras
                 itens={itens}
                 ehAVista={ehAVista}
@@ -414,6 +424,7 @@ export function Despesas() {
           totalCents={totalFixo}
           quantidadeItens={despesasFixasAtivas.length + fixoParcelamentos.length}
           corAccent={corPorOrigem("fixo")}
+          icon={Home}
         >
           {despesasFixasAtivas.length > 0 && (
             <>
@@ -525,6 +536,7 @@ function GrupoDeCompras({
 }
 
 function AdicionarDespesaFixa({ onAdded }: { onAdded: () => void }) {
+  const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState("");
   const [valor, setValor] = useState("");
   const [categoria, setCategoria] = useState<string | null>(null);
@@ -540,7 +552,26 @@ function AdicionarDespesaFixa({ onAdded }: { onAdded: () => void }) {
     setValor("");
     setCategoria(null);
     setDiaVencimento("");
+    setAberto(false);
     onAdded();
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        className="q-btn"
+        onClick={() => setAberto(true)}
+        style={{
+          border: "1.5px dashed var(--q-border-input)", borderRadius: 14, padding: 13,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          color: "var(--q-text-muted)", fontWeight: 600, fontSize: "var(--fs-sm)",
+          background: "transparent", cursor: "pointer", width: "100%", marginBottom: 10,
+        }}
+      >
+        <Plus size={15} />
+        Nova despesa fixa
+      </button>
+    );
   }
 
   return (
@@ -551,7 +582,7 @@ function AdicionarDespesaFixa({ onAdded }: { onAdded: () => void }) {
       </div>
       <form onSubmit={adicionar} style={styles.formRow}>
         <Field label="Nome">
-          <input placeholder="ex: Aluguel" value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} />
+          <input placeholder="ex: Aluguel" value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} autoFocus />
         </Field>
         <Field label="Valor (R$)">
           <input placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} style={styles.inputMono} />
@@ -562,15 +593,21 @@ function AdicionarDespesaFixa({ onAdded }: { onAdded: () => void }) {
         <Field label="Categoria">
           <CategoriaSelect value={categoria} onChange={setCategoria} />
         </Field>
-        <button className="q-btn" type="submit" style={styles.button}>
-          Adicionar
-        </button>
+        <div style={{ display: "flex", gap: 8, width: "100%" }}>
+          <button className="q-btn" type="button" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setAberto(false)}>
+            Cancelar
+          </button>
+          <button className="q-btn" type="submit" style={{ ...styles.button, flex: 1 }}>
+            Adicionar
+          </button>
+        </div>
       </form>
     </section>
   );
 }
 
 function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdded: () => void }) {
+  const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState("");
   const [valor, setValor] = useState("");
   const [parcelaAtual, setParcelaAtual] = useState("1");
@@ -612,7 +649,26 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
     setDiaVencimento("");
     setMesInicio(mesAtual);
     setOrigemSelecionada("manual");
+    setAberto(false);
     onAdded();
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        className="q-btn"
+        onClick={() => setAberto(true)}
+        style={{
+          border: "1.5px dashed var(--q-border-input)", borderRadius: 14, padding: 13,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          color: "var(--q-text-muted)", fontWeight: 600, fontSize: "var(--fs-sm)",
+          background: "transparent", cursor: "pointer", width: "100%",
+        }}
+      >
+        <Plus size={15} />
+        Novo parcelamento/empréstimo
+      </button>
+    );
   }
 
   return (
@@ -627,7 +683,7 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
       <form onSubmit={adicionar}>
         <div style={styles.formRow}>
           <Field label="Nome">
-            <input placeholder="ex: Financiamento carro" value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} />
+            <input placeholder="ex: Financiamento carro" value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} autoFocus />
           </Field>
           <Field label="Valor da parcela (R$)">
             <input placeholder="0,00" value={valor} onChange={(e) => setValor(e.target.value)} style={styles.inputMono} />
@@ -671,7 +727,12 @@ function AdicionarParcelamento({ mesAtual, onAdded }: { mesAtual: string; onAdde
             <input type="checkbox" checked={continuaIndefinidamente} onChange={(e) => setContinuaIndefinidamente(e.target.checked)} />
             sem término definido (financiamento)
           </label>
-          <button className="q-btn" type="submit" style={styles.button}>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="q-btn" type="button" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setAberto(false)}>
+            Cancelar
+          </button>
+          <button className="q-btn" type="submit" style={{ ...styles.button, flex: 1 }}>
             Adicionar
           </button>
         </div>
