@@ -117,6 +117,20 @@ export const removerMembro: Handler<unknown, { userId: string }> = async ({ db, 
   return { status: 204, body: null };
 };
 
+/** Promove outro membro a dono — uma família pode ter mais de um dono ao mesmo tempo (não substitui, só adiciona). */
+export const promoverDono: Handler<unknown, { userId: string }> = async ({ db, params, session }) => {
+  if (session!.papel !== "dono") {
+    throw new HttpError(403, "Só o dono da família pode promover outro dono.");
+  }
+  const [row] = await db
+    .update(householdMembers)
+    .set({ papel: "dono" })
+    .where(and(eq(householdMembers.userId, params.userId), eq(householdMembers.householdId, session!.householdId)))
+    .returning();
+  if (!row) throw new HttpError(404, "Membro não encontrado nessa família");
+  return { status: 200, body: row };
+};
+
 /**
  * Sai da família ativa por vontade própria — diferente de `removerMembro`
  * (que exige dono e nunca permite se autoexcluir), aqui é sempre a própria
@@ -126,16 +140,29 @@ export const removerMembro: Handler<unknown, { userId: string }> = async ({ db, 
  */
 export const sairDaFamilia: Handler = async ({ db, session }) => {
   if (session!.papel === "dono") {
-    const [outroMembro] = await db
+    const [outroDono] = await db
       .select()
       .from(householdMembers)
-      .where(and(eq(householdMembers.householdId, session!.householdId), ne(householdMembers.userId, session!.userId)))
+      .where(
+        and(
+          eq(householdMembers.householdId, session!.householdId),
+          ne(householdMembers.userId, session!.userId),
+          eq(householdMembers.papel, "dono"),
+        ),
+      )
       .limit(1);
-    if (outroMembro) {
-      throw new HttpError(
-        409,
-        "Você é dono dessa família e ainda tem outras pessoas nela — remova todo mundo antes de sair.",
-      );
+    if (!outroDono) {
+      const [outroMembro] = await db
+        .select()
+        .from(householdMembers)
+        .where(and(eq(householdMembers.householdId, session!.householdId), ne(householdMembers.userId, session!.userId)))
+        .limit(1);
+      if (outroMembro) {
+        throw new HttpError(
+          409,
+          "Você é o único dono dessa família e ainda tem outras pessoas nela — torne outra pessoa dona antes de sair.",
+        );
+      }
     }
   }
 

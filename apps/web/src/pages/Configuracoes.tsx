@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Check, Copy, LogOut, Pencil, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Crown, LogOut, Pencil, Trash2, UserPlus } from "lucide-react";
 import { authApi, cartoesApi, configApi, householdApi } from "../api/resources.js";
 import { ApiError } from "../api/client.js";
 import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow, MinhaFamilia } from "../api/types.js";
@@ -233,6 +233,12 @@ function SecaoFamilia() {
     carregar();
   }
 
+  async function promoverDono(userId: string, nomeMembro: string) {
+    if (!window.confirm(`Tornar ${nomeMembro} dono(a) dessa família também? Quem for dono pode remover outros membros.`)) return;
+    await householdApi.promoverDono(userId);
+    carregar();
+  }
+
   async function salvarNome(e: React.FormEvent) {
     e.preventDefault();
     if (!nome.trim()) return;
@@ -289,6 +295,17 @@ function SecaoFamilia() {
           </div>
           {souDono && membro.id !== meuId && (
             <div style={styles.listRowActions}>
+              {membro.papel !== "dono" && (
+                <button
+                  className="q-btn"
+                  style={{ ...styles.buttonGhost, padding: 8 }}
+                  onClick={() => promoverDono(membro.id, membro.nome ?? membro.email)}
+                  aria-label="Tornar dono"
+                  title="Tornar dono"
+                >
+                  <Crown size={14} color="var(--q-gold)" />
+                </button>
+              )}
               <button
                 className="q-btn"
                 style={{ ...styles.buttonGhost, padding: 8 }}

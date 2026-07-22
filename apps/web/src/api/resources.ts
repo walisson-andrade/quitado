@@ -11,6 +11,7 @@ import type {
   DevedorRow,
   FaturaImportadaRow,
   HouseholdRow,
+  MembroHousehold,
   MetaAporteRow,
   MetaPoupancaRow,
   MinhaFamilia,
@@ -35,6 +36,7 @@ export const householdApi = {
   removerConvite: (id: string) => api.delete<void>(`/household/convites/${id}`),
   aceitarConvite: (token: string) => api.post<{ ok: true }>(`/household/convites/${token}/aceitar`),
   removerMembro: (userId: string) => api.delete<void>(`/household/membros/${userId}`),
+  promoverDono: (userId: string) => api.post<MembroHousehold>(`/household/membros/${userId}/promover`),
   sair: () => api.post<{ ok: true; semFamilia: boolean }>("/household/sair"),
 };
 
