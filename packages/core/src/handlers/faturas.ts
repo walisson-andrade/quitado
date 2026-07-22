@@ -40,10 +40,13 @@ export const obterUltimaFaturaPorOrigem: Handler = async ({ db, session }) => {
   return { status: 200, body: mapa };
 };
 
+// Base64 infla o tamanho em ~4/3 — 14_000_000 chars cobre até ~10MB de
+// arquivo real. Limite existe pra não deixar alguém mandar payload gigante
+// pro parser de CSV ou, pior, pra API paga do Gemini a cada chamada.
 const CriarFaturaInputSchema = z.object({
   nomeArquivo: z.string().min(1),
   mimeType: z.string().min(1),
-  conteudoBase64: z.string().min(1),
+  conteudoBase64: z.string().min(1).max(14_000_000, "Arquivo muito grande (máximo ~10MB)."),
   tipoOrigem: z.enum(["pdf_imagem_ia", "csv_nubank"]),
 });
 

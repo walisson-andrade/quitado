@@ -140,9 +140,12 @@ export interface ConviteRow {
   criadoEm: string;
 }
 
+export type MoedaSalario = "BRL" | "EUR" | "USD";
+
 export interface ConfigRow {
-  salarioEurCents: number;
-  eurBrlRate: number | null;
+  salarioCents: number;
+  moedaSalario: MoedaSalario;
+  cotacaoBrl: number | null;
   mesAtualOverride: MesReferencia | null;
   mesAtual: MesReferencia;
 }
@@ -181,7 +184,7 @@ export interface OrigemTotal {
 
 export interface DashboardResponse {
   mesAtual: MesReferencia;
-  eurBrlRate: number;
+  cotacaoBrl: number;
   projecao: Array<{ mes: MesReferencia; saldo: SaldoMensalResultado }>;
   saldoMesAtual: SaldoMensalResultado | null;
   porCategoria: CategoriaTotal[];

@@ -53,6 +53,7 @@ export const routes: Route[] = [
 
   { method: "GET", pattern: "/config", handler: protegida(configHandlers.obterConfig) },
   { method: "PATCH", pattern: "/config", handler: protegida(configHandlers.atualizarConfig) },
+  { method: "GET", pattern: "/config/cotacao", handler: protegida(configHandlers.obterCotacaoAtual) },
 
   { method: "GET", pattern: "/dashboard", handler: protegida(dashboardHandlers.obterDashboard) },
 

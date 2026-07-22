@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeftRight, Check, Copy, Crown, LogOut, Pencil, Trash2, UserPlus } from "lucide-react";
 import { authApi, cartoesApi, configApi, householdApi } from "../api/resources.js";
 import { ApiError } from "../api/client.js";
-import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow, MinhaFamilia } from "../api/types.js";
+import type { CartaoRow, ConfigRow, ConviteRow, HouseholdRow, MinhaFamilia, MoedaSalario } from "../api/types.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
 import { styles } from "../styles.js";
@@ -347,16 +347,19 @@ function SecaoFamilia() {
 
 export function Configuracoes({ onLogout }: { onLogout: () => void }) {
   const [config, setConfig] = useState<ConfigRow | null>(null);
-  const [salarioEur, setSalarioEur] = useState("");
+  const [salario, setSalario] = useState("");
+  const [moeda, setMoeda] = useState<MoedaSalario>("BRL");
   const [cotacao, setCotacao] = useState("");
+  const [buscandoCotacao, setBuscandoCotacao] = useState(false);
   const [mesOverride, setMesOverride] = useState("");
   const [mensagem, setMensagem] = useState<string | null>(null);
 
   useEffect(() => {
     configApi.obter().then((c) => {
       setConfig(c);
-      setSalarioEur(String(c.salarioEurCents / 100));
-      setCotacao(String(c.eurBrlRate ?? ""));
+      setSalario(String(c.salarioCents / 100));
+      setMoeda(c.moedaSalario);
+      setCotacao(String(c.cotacaoBrl ?? ""));
       setMesOverride(c.mesAtualOverride ?? "");
     });
   }, []);
@@ -364,12 +367,26 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
   async function salvarConfig(e: React.FormEvent) {
     e.preventDefault();
     const atualizado = await configApi.atualizar({
-      salarioEurCents: Math.round(Number(salarioEur.replace(",", ".")) * 100),
-      eurBrlRate: Number(cotacao.replace(",", ".")),
+      salarioCents: Math.round(Number(salario.replace(",", ".")) * 100),
+      moedaSalario: moeda,
+      ...(moeda !== "BRL" ? { cotacaoBrl: Number(cotacao.replace(",", ".")) } : {}),
       mesAtualOverride: mesOverride || null,
     });
     setConfig(atualizado);
     setMensagem("Configurações salvas.");
+  }
+
+  async function atualizarCotacao() {
+    if (moeda === "BRL") return;
+    setBuscandoCotacao(true);
+    try {
+      const { cotacao: valorAtual } = await configApi.obterCotacaoAtual(moeda);
+      setCotacao(String(valorAtual));
+    } catch {
+      setMensagem("Não consegui buscar a cotação agora — tenta de novo em instantes.");
+    } finally {
+      setBuscandoCotacao(false);
+    }
   }
 
   async function sair() {
@@ -383,18 +400,38 @@ export function Configuracoes({ onLogout }: { onLogout: () => void }) {
     <>
       <section className="q-surface" style={styles.panel}>
         <div style={styles.panelHeadRow}>
-          <h3 style={styles.panelTitle}>Renda e cotação</h3>
-          <span style={styles.panelHint}>usados para calcular a renda em BRL</span>
+          <h3 style={styles.panelTitle}>Renda</h3>
+          <span style={styles.panelHint}>seu salário — se não for em reais, também a cotação usada pra converter</span>
         </div>
         <form onSubmit={salvarConfig}>
           <div style={styles.formRow}>
-            <Field label="Salário (EUR)">
-              <input placeholder="2990" value={salarioEur} onChange={(e) => setSalarioEur(e.target.value)} style={styles.inputMono} />
+            <Field label="Moeda do salário">
+              <select value={moeda} onChange={(e) => setMoeda(e.target.value as MoedaSalario)} style={{ ...styles.input, width: "100%" }}>
+                <option value="BRL">Real (BRL)</option>
+                <option value="EUR">Euro (EUR)</option>
+                <option value="USD">Dólar (USD)</option>
+              </select>
             </Field>
-            <Field label="Cotação EUR→BRL">
-              <input placeholder="5,91" value={cotacao} onChange={(e) => setCotacao(e.target.value)} style={styles.inputMono} />
+            <Field label={`Salário (${moeda})`}>
+              <input placeholder="2990" value={salario} onChange={(e) => setSalario(e.target.value)} style={styles.inputMono} />
             </Field>
           </div>
+          {moeda !== "BRL" && (
+            <div style={styles.formRow}>
+              <Field label={`Cotação ${moeda}→BRL`}>
+                <input placeholder="5,91" value={cotacao} onChange={(e) => setCotacao(e.target.value)} style={styles.inputMono} />
+              </Field>
+              <button
+                className="q-btn"
+                type="button"
+                onClick={atualizarCotacao}
+                disabled={buscandoCotacao}
+                style={{ ...styles.buttonGhost, alignSelf: "flex-end" }}
+              >
+                {buscandoCotacao ? "Buscando…" : "Atualizar cotação"}
+              </button>
+            </div>
+          )}
           <div style={styles.formRow}>
             <Field label="Mês atual (deixe vazio para usar a data do sistema)">
               <MesInput value={mesOverride} onChange={setMesOverride} permiteVazio />

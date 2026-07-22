@@ -76,8 +76,10 @@ export const householdConfig = pgTable("quitado_household_config", {
   householdId: uuid("household_id")
     .primaryKey()
     .references(() => households.id, { onDelete: "cascade" }),
-  salarioEurCents: integer("salario_eur_cents").notNull().default(0),
-  eurBrlRate: numeric("eur_brl_rate", { precision: 10, scale: 4 }).notNull().default("1.0"),
+  salarioCents: integer("salario_cents").notNull().default(0),
+  /** 'BRL' | 'EUR' | 'USD' — BRL não precisa de conversão (cotação sempre 1 nesse caso). */
+  moedaSalario: text("moeda_salario").notNull().default("BRL"),
+  cotacaoBrl: numeric("cotacao_brl", { precision: 10, scale: 4 }).notNull().default("1.0"),
   mesAtualOverride: char("mes_atual_override", { length: 7 }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

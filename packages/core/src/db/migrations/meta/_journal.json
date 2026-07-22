@@ -85,6 +85,13 @@
       "when": 1784676807410,
       "tag": "0011_multi_household_membership",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784679988046,
+      "tag": "0012_moeda_salario_configuravel",
+      "breakpoints": true
     }
   ]
 }

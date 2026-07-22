@@ -51,8 +51,8 @@ export const obterDashboard: Handler = async ({ db, query, session }) => {
     buscarUltimaFaturaPorOrigem(db, householdId),
   ]);
 
-  const eurBrlRate = config ? Number(config.eurBrlRate) : 1;
-  const rendaCents = calcularRendaBRL(config?.salarioEurCents ?? 0, eurBrlRate);
+  const cotacaoBrl = config && config.moedaSalario !== "BRL" ? Number(config.cotacaoBrl) : 1;
+  const rendaCents = calcularRendaBRL(config?.salarioCents ?? 0, cotacaoBrl);
 
   const projecao = projetarSaldos({
     meses,
@@ -75,7 +75,7 @@ export const obterDashboard: Handler = async ({ db, query, session }) => {
     status: 200,
     body: {
       mesAtual,
-      eurBrlRate,
+      cotacaoBrl,
       projecao,
       saldoMesAtual: projecao[0]?.saldo ?? null,
       porCategoria,

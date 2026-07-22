@@ -15,6 +15,7 @@ import type {
   MetaAporteRow,
   MetaPoupancaRow,
   MinhaFamilia,
+  MoedaSalario,
   ParcelaDevedorRow,
   ParcelamentoRow,
   ReembolsoRow,
@@ -42,8 +43,9 @@ export const householdApi = {
 
 export const configApi = {
   obter: () => api.get<ConfigRow>("/config"),
-  atualizar: (input: Partial<{ salarioEurCents: number; eurBrlRate: number; mesAtualOverride: string | null }>) =>
+  atualizar: (input: Partial<{ salarioCents: number; moedaSalario: MoedaSalario; cotacaoBrl: number; mesAtualOverride: string | null }>) =>
     api.patch<ConfigRow>("/config", input),
+  obterCotacaoAtual: (moeda: "EUR" | "USD") => api.get<{ cotacao: number }>(`/config/cotacao?moeda=${moeda}`),
 };
 
 export const dashboardApi = {

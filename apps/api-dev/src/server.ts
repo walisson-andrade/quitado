@@ -32,6 +32,7 @@ app.all("/api/*", async (request, reply) => {
       reply.setCookie(c.name, c.value, {
         path: "/",
         httpOnly: true,
+        secure: false, // dev local é sempre http://localhost, nunca https
         sameSite: "lax",
         maxAge: c.maxAgeSeconds ?? 0,
       });

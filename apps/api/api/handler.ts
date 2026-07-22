@@ -22,13 +22,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const result = await match.route.handler({ db, body: req.body, params: match.params, query, cookies });
 
-    for (const c of result.setCookies ?? []) {
-      res.setHeader("Set-Cookie", serializeCookie(c.name, c.value, {
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: c.maxAgeSeconds ?? 0,
-      }));
+    if (result.setCookies?.length) {
+      res.setHeader(
+        "Set-Cookie",
+        result.setCookies.map((c) =>
+          serializeCookie(c.name, c.value, {
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+            maxAge: c.maxAgeSeconds ?? 0,
+          }),
+        ),
+      );
     }
 
     if (result.redirectTo) {
