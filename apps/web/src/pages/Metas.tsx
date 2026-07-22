@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Car, ChevronRight, GraduationCap, Home, Pencil, Plane, Plus, ShieldAlert, ShoppingBag, Target, Trash2,
+  Car, GraduationCap, Home, Pencil, Plane, Plus, ShieldAlert, ShoppingBag, Target, Trash2, X,
 } from "lucide-react";
 import { calcularAporteNecessario, calcularProgressoMeta, mesesRestantesMeta } from "@quitado/calc";
 import { configApi, dashboardApi, metasApi } from "../api/resources.js";
@@ -20,6 +20,20 @@ const CATEGORIA_INFO: Record<MetaCategoria, { label: string; cor: string; Icon: 
   emergencia: { label: "Emergência", cor: "var(--q-orange)", Icon: ShieldAlert },
   outro: { label: "Outro", cor: "var(--q-text-muted)", Icon: Target },
 };
+
+function IconeMeta({ categoria, tamanho = 34 }: { categoria: MetaCategoria; tamanho?: number }) {
+  const { cor, Icon } = CATEGORIA_INFO[categoria];
+  return (
+    <div
+      style={{
+        width: tamanho, height: tamanho, borderRadius: tamanho >= 40 ? 12 : 10, flexShrink: 0, display: "flex",
+        alignItems: "center", justifyContent: "center", background: `color-mix(in srgb, ${cor} 16%, transparent)`,
+      }}
+    >
+      <Icon size={Math.round(tamanho * 0.46)} color={cor} />
+    </div>
+  );
+}
 
 function LinhaHistoricoAporte({
   item,
@@ -80,20 +94,60 @@ function LinhaHistoricoAporte({
   );
 }
 
-function MetaCard({
+function MetaCardResumo({ meta, onAbrir }: { meta: MetaRow; onAbrir: () => void }) {
+  const { cor } = CATEGORIA_INFO[meta.categoria];
+  const progresso = calcularProgressoMeta(meta);
+  const concluida = progresso.percentual >= 1;
+
+  return (
+    <button
+      className="q-btn"
+      onClick={onAbrir}
+      style={{
+        width: "100%", textAlign: "left", cursor: "pointer", color: "var(--q-text)",
+        background: "var(--q-card-bg)", border: "1px solid var(--q-border)", borderRadius: 16,
+        padding: 14, display: "flex", flexDirection: "column", gap: 10,
+        boxShadow: "0 1px 0 var(--q-shadow-inset, rgba(255,255,255,0.03)) inset",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <IconeMeta categoria={meta.categoria} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {meta.nome}
+          </div>
+          <div style={{ fontSize: "var(--fs-xs)", color: "var(--q-text-faint)" }}>{(progresso.percentual * 100).toFixed(0)}% guardado</div>
+        </div>
+        {concluida && (
+          <span style={{ fontSize: "var(--fs-tiny)", fontWeight: 700, color: "var(--q-teal)", background: "var(--q-success-tint)", border: "1px solid var(--q-teal)", padding: "2px 8px", borderRadius: 999, flexShrink: 0 }}>
+            Concluída ✓
+          </span>
+        )}
+      </div>
+      <BarraProgresso progresso={Math.min(progresso.percentual, 1) * 100} cor={cor} />
+      <div style={{ ...styles.cardFoot, display: "flex", justifyContent: "space-between" }}>
+        <span className="mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(meta.acumuladoCents)} / {fmt(meta.valorAlvoCents)}</span>
+        <span>{concluida ? "concluída" : `até ${mesLabel(meta.prazo)}`}</span>
+      </div>
+    </button>
+  );
+}
+
+function MetaSheet({
   meta,
   mesAtual,
   saldoLivreCents,
+  onFechar,
   onMudou,
   onRemovida,
 }: {
   meta: MetaRow;
   mesAtual: string;
   saldoLivreCents: number | null;
+  onFechar: () => void;
   onMudou: () => void;
   onRemovida: () => void;
 }) {
-  const [aberto, setAberto] = useState(false);
   const [historico, setHistorico] = useState<MetaAporteRow[] | null>(null);
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState(meta.nome);
@@ -101,9 +155,10 @@ function MetaCard({
   const [valorAlvo, setValorAlvo] = useState(String(meta.valorAlvoCents / 100));
   const [prazo, setPrazo] = useState(meta.prazo);
   const [aporteValor, setAporteValor] = useState("");
+  const [aportando, setAportando] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
-  const { label, cor, Icon } = CATEGORIA_INFO[meta.categoria];
+  const { cor } = CATEGORIA_INFO[meta.categoria];
   const progresso = calcularProgressoMeta(meta);
   const concluida = progresso.percentual >= 1;
 
@@ -111,11 +166,15 @@ function MetaCard({
     metasApi.listarAportes(meta.id).then(setHistorico);
   }
 
-  function alternar() {
-    const abrindo = !aberto;
-    setAberto(abrindo);
-    if (abrindo && historico === null) carregarHistorico();
-  }
+  useEffect(() => {
+    carregarHistorico();
+    setEditando(false);
+    setNome(meta.nome);
+    setCategoria(meta.categoria);
+    setValorAlvo(String(meta.valorAlvoCents / 100));
+    setPrazo(meta.prazo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta.id]);
 
   const mesAtualJaContemplado = historico?.some((h) => h.mesReferencia === mesAtual) ?? false;
   const aporteSugeridoCents = calcularAporteNecessario(meta, mesAtual, mesAtualJaContemplado);
@@ -128,6 +187,7 @@ function MetaCard({
     try {
       await metasApi.registrarAporte(meta.id, { mesReferencia: mesAtual, valorCents });
       setAporteValor("");
+      setAportando(false);
       carregarHistorico();
       onMudou();
     } finally {
@@ -167,161 +227,158 @@ function MetaCard({
   }
 
   return (
-    <div className="q-surface" style={{ border: "1px solid var(--q-border)", borderRadius: 12, overflow: "hidden" }}>
-      <button
-        className="q-btn"
-        onClick={alternar}
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "var(--q-scrim, rgba(5,8,16,0.65))",
+        display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onFechar(); }}
+    >
+      <div
+        className="q-tab-fade"
         style={{
-          width: "100%", display: "flex", flexDirection: "column", gap: 8,
-          padding: "12px 14px", background: "var(--q-inset-bg)", border: "none",
-          cursor: "pointer", color: "var(--q-text)", textAlign: "left",
+          width: "100%", maxWidth: "var(--app-max-width)", maxHeight: "88vh", overflowY: "auto",
+          background: "var(--q-bg)", border: "1px solid var(--q-border)", borderBottom: "none",
+          borderRadius: "20px 20px 0 0", padding: "10px 18px 22px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={15} color={cor} style={{ flexShrink: 0 }} />
-          <div
-            style={{
-              width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: "flex",
-              alignItems: "center", justifyContent: "center", background: `color-mix(in srgb, ${cor} 16%, transparent)`,
-            }}
-          >
-            <Icon size={16} color={cor} />
-          </div>
-          <span style={{ flex: 1, minWidth: 0, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ width: 36, height: 4, borderRadius: 3, background: "var(--q-border-input)", margin: "0 auto 14px" }} />
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <IconeMeta categoria={meta.categoria} tamanho={44} />
+          <div style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-lg)", fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {meta.nome}
-          </span>
-          {concluida && (
-            <span style={{ fontSize: "var(--fs-tiny)", fontWeight: 700, color: "var(--q-teal)", background: "var(--q-success-tint)", border: "1px solid var(--q-teal)", padding: "2px 8px", borderRadius: 999, flexShrink: 0 }}>
-              Concluída ✓
-            </span>
-          )}
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-sm)", fontWeight: 600, flexShrink: 0 }}>
-            {(progresso.percentual * 100).toFixed(0)}%
-          </span>
+          </div>
+          <button
+            className="q-btn"
+            onClick={onFechar}
+            aria-label="Fechar"
+            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--q-border)", background: "var(--q-card-bg)", color: "var(--q-text-muted)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+          >
+            <X size={14} />
+          </button>
         </div>
+
         <BarraProgresso progresso={Math.min(progresso.percentual, 1) * 100} cor={cor} />
-        <div style={{ ...styles.cardFoot, display: "flex", justifyContent: "space-between" }}>
-          <span>{fmt(meta.acumuladoCents)} de {fmt(meta.valorAlvoCents)}</span>
-          <span>{concluida ? "concluída" : `até ${mesLabel(meta.prazo)}`}</span>
+
+        <div style={{ display: "flex", gap: 8, margin: "14px 0 18px" }}>
+          <div style={{ flex: 1, background: "var(--q-inset-bg)", border: "1px solid var(--q-border)", borderRadius: 12, padding: "9px 11px" }}>
+            <div style={{ fontSize: "var(--fs-tiny)", color: "var(--q-text-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>guardado</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: cor }}>{fmt(meta.acumuladoCents)}</div>
+          </div>
+          <div style={{ flex: 1, background: "var(--q-inset-bg)", border: "1px solid var(--q-border)", borderRadius: 12, padding: "9px 11px" }}>
+            <div style={{ fontSize: "var(--fs-tiny)", color: "var(--q-text-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>alvo</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{fmt(meta.valorAlvoCents)}</div>
+          </div>
+          <div style={{ flex: 1, background: "var(--q-inset-bg)", border: "1px solid var(--q-border)", borderRadius: 12, padding: "9px 11px" }}>
+            <div style={{ fontSize: "var(--fs-tiny)", color: "var(--q-text-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>falta</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{fmt(progresso.restanteCents)}</div>
+          </div>
         </div>
-      </button>
 
-      <div className={`q-expand${aberto ? " aberto" : ""}`}>
-        <div style={{ padding: aberto ? "14px" : "0 14px", overflow: "hidden" }}>
-          {editando ? (
-            <form onSubmit={salvarEdicao} style={{ marginBottom: 14 }}>
-              <div style={styles.formRow}>
-                <Field label="Nome">
-                  <input value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} />
-                </Field>
-                <Field label="Categoria">
-                  <select value={categoria} onChange={(e) => setCategoria(e.target.value as MetaCategoria)} style={{ ...styles.input, width: "100%" }}>
-                    {(Object.keys(CATEGORIA_INFO) as MetaCategoria[]).map((c) => (
-                      <option key={c} value={c}>{CATEGORIA_INFO[c].label}</option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-              <div style={styles.formRow}>
-                <Field label="Valor alvo (R$)">
-                  <input value={valorAlvo} onChange={(e) => setValorAlvo(e.target.value)} style={styles.inputMono} />
-                </Field>
-                <Field label="Prazo">
-                  <MesInput value={prazo} onChange={setPrazo} />
-                </Field>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="q-btn" type="button" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setEditando(false)}>
-                  Cancelar
-                </button>
-                <button className="q-btn" type="submit" style={{ ...styles.button, flex: 1 }}>
-                  Salvar
-                </button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                <div style={{ flex: 1, background: "var(--q-card-bg)", border: "1px solid var(--q-border)", borderRadius: 10, padding: "8px 10px" }}>
-                  <div style={{ fontSize: "var(--fs-tiny)", color: "var(--q-text-faint)" }}>guardado</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: cor }}>{fmt(meta.acumuladoCents)}</div>
-                </div>
-                <div style={{ flex: 1, background: "var(--q-card-bg)", border: "1px solid var(--q-border)", borderRadius: 10, padding: "8px 10px" }}>
-                  <div style={{ fontSize: "var(--fs-tiny)", color: "var(--q-text-faint)" }}>falta</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{fmt(progresso.restanteCents)}</div>
-                </div>
-              </div>
+        {!concluida && !mesAtualJaContemplado && historico !== null && !aportando && (
+          <div style={{ ...styles.panelHint, marginBottom: 8 }}>
+            Pra bater em {mesesRestantes} {mesesRestantes === 1 ? "mês" : "meses"}, guarde{" "}
+            <span style={{ color: cor, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(aporteSugeridoCents)}/mês</span>
+            {cabeNoSaldo !== null && (cabeNoSaldo ? " · cabe no seu saldo livre" : " · é mais do que sobra hoje no orçamento")}
+          </div>
+        )}
 
-              {!concluida && historico !== null && (
-                <div style={{ ...styles.panel, background: "var(--q-card-bg)", padding: 10, marginBottom: 14, border: `1px solid ${cabeNoSaldo === false ? "var(--q-orange)" : "var(--q-border-input)"}` }}>
-                  <div style={styles.cardFoot}>
-                    Pra bater em {mesesRestantes} {mesesRestantes === 1 ? "mês" : "meses"}, guarde
-                  </div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: cor, marginTop: 2 }}>{fmt(aporteSugeridoCents)}/mês</div>
-                  {mesAtualJaContemplado ? (
-                    <div style={{ ...styles.cardFoot, color: "var(--q-teal)", marginTop: 4 }}>{fmt(historico.find((h) => h.mesReferencia === mesAtual)?.valorCents ?? 0)} guardado este mês ✓</div>
-                  ) : (
-                    <>
-                      {cabeNoSaldo !== null && (
-                        <div style={{ ...styles.cardFoot, color: cabeNoSaldo ? "var(--q-teal)" : "var(--q-orange)", marginTop: 4 }}>
-                          {cabeNoSaldo ? "cabe no seu saldo livre atual" : "é mais do que sobra hoje no orçamento"}
-                        </div>
-                      )}
-                      <button
-                        className="q-btn" type="button"
-                        disabled={salvando}
-                        style={{ ...styles.buttonGhost, marginTop: 8, width: "100%", padding: "7px 10px", fontSize: 11 }}
-                        onClick={() => guardarAporte(aporteSugeridoCents)}
-                      >
-                        {salvando ? "Guardando..." : `Guardar ${fmt(aporteSugeridoCents)} este mês`}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
+        {mesAtualJaContemplado && (
+          <div style={{ ...styles.panelHint, color: "var(--q-teal)", marginBottom: 8 }}>
+            {fmt(historico?.find((h) => h.mesReferencia === mesAtual)?.valorCents ?? 0)} guardado este mês ✓
+          </div>
+        )}
 
-              <div style={styles.formRow}>
-                <Field label="Guardar outro valor (R$)">
-                  <input placeholder="0,00" value={aporteValor} onChange={(e) => setAporteValor(e.target.value)} style={styles.inputMono} />
-                </Field>
-                <button
-                  className="q-btn" type="button" disabled={salvando}
-                  style={{ ...styles.buttonGhost, alignSelf: "flex-end" }}
-                  onClick={() => guardarAporte(Math.round(Number(aporteValor.replace(",", ".")) * 100) || 0)}
-                >
-                  Guardar
-                </button>
-              </div>
+        {aportando ? (
+          <div style={{ ...styles.formRow, marginBottom: 18, alignItems: "flex-end" }}>
+            <Field label="Valor (R$)">
+              <input autoFocus placeholder={String(aporteSugeridoCents / 100)} value={aporteValor} onChange={(e) => setAporteValor(e.target.value)} style={styles.inputMono} />
+            </Field>
+            <button className="q-btn" type="button" style={styles.buttonGhost} onClick={() => setAportando(false)}>
+              Cancelar
+            </button>
+            <button
+              className="q-btn" type="button" disabled={salvando}
+              style={{ ...styles.button, background: cor }}
+              onClick={() => guardarAporte(Math.round(Number(aporteValor.replace(",", ".")) * 100) || aporteSugeridoCents)}
+            >
+              {salvando ? "Guardando…" : "Confirmar"}
+            </button>
+          </div>
+        ) : (
+          !concluida && (
+            <button
+              className="q-btn" type="button"
+              style={{ ...styles.button, width: "100%", marginBottom: 18, background: cor }}
+              onClick={() => setAportando(true)}
+            >
+              Guardar aporte nessa meta
+            </button>
+          )
+        )}
 
-              <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 4 }}>
-                <button className="q-btn" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setEditando(true)}>
-                  <Pencil size={13} color="var(--q-blue)" style={{ marginRight: 5, verticalAlign: -2 }} />
-                  Editar
-                </button>
-                <button className="q-btn" style={{ ...styles.buttonGhost, flex: 1 }} onClick={remover}>
-                  <Trash2 size={13} color="var(--q-orange)" style={{ marginRight: 5, verticalAlign: -2 }} />
-                  Excluir meta
-                </button>
-              </div>
+        {editando ? (
+          <form onSubmit={salvarEdicao} style={{ marginBottom: 14 }}>
+            <div style={styles.formRow}>
+              <Field label="Nome">
+                <input value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} />
+              </Field>
+              <Field label="Categoria">
+                <select value={categoria} onChange={(e) => setCategoria(e.target.value as MetaCategoria)} style={{ ...styles.input, width: "100%" }}>
+                  {(Object.keys(CATEGORIA_INFO) as MetaCategoria[]).map((c) => (
+                    <option key={c} value={c}>{CATEGORIA_INFO[c].label}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <div style={styles.formRow}>
+              <Field label="Valor alvo (R$)">
+                <input value={valorAlvo} onChange={(e) => setValorAlvo(e.target.value)} style={styles.inputMono} />
+              </Field>
+              <Field label="Prazo">
+                <MesInput value={prazo} onChange={setPrazo} />
+              </Field>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="q-btn" type="button" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setEditando(false)}>
+                Cancelar
+              </button>
+              <button className="q-btn" type="submit" style={{ ...styles.button, flex: 1 }}>
+                Salvar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+            <button className="q-btn" style={{ ...styles.buttonGhost, flex: 1 }} onClick={() => setEditando(true)}>
+              <Pencil size={13} color="var(--q-blue)" style={{ marginRight: 5, verticalAlign: -2 }} />
+              Editar
+            </button>
+            <button className="q-btn" style={{ ...styles.buttonGhost, flex: 1 }} onClick={remover}>
+              <Trash2 size={13} color="var(--q-orange)" style={{ marginRight: 5, verticalAlign: -2 }} />
+              Excluir meta
+            </button>
+          </div>
+        )}
 
-              <div style={{ ...styles.panelHint, marginTop: 10, marginBottom: 4, fontWeight: 600 }}>Histórico</div>
-              {historico === null ? (
-                <div style={styles.panelHint}>Carregando...</div>
-              ) : historico.length === 0 ? (
-                <div style={styles.panelHint}>Nenhum aporte registrado ainda.</div>
-              ) : (
-                historico.map((item) => (
-                  <LinhaHistoricoAporte
-                    key={item.id}
-                    item={item}
-                    onSalvarEdicao={(patch) => salvarEdicaoAporte(item.id, patch)}
-                    onRemover={() => removerAporte(item.id)}
-                  />
-                ))
-              )}
-            </>
-          )}
+        <div style={{ fontSize: "var(--fs-xs)", color: "var(--q-text-faint)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+          Histórico de aportes
         </div>
+        {historico === null ? (
+          <div style={styles.panelHint}>Carregando...</div>
+        ) : historico.length === 0 ? (
+          <div style={styles.panelHint}>Nenhum aporte registrado ainda.</div>
+        ) : (
+          historico.map((item) => (
+            <LinhaHistoricoAporte
+              key={item.id}
+              item={item}
+              onSalvarEdicao={(patch) => salvarEdicaoAporte(item.id, patch)}
+              onRemover={() => removerAporte(item.id)}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -357,7 +414,7 @@ function NovaMeta({ onCriada }: { onCriada: () => void }) {
         className="q-btn"
         onClick={() => setAberto(true)}
         style={{
-          border: "1.5px dashed var(--q-border-input)", borderRadius: 12, padding: 14,
+          border: "1.5px dashed var(--q-border-input)", borderRadius: 16, padding: 14,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           color: "var(--q-text-muted)", fontWeight: 600, fontSize: "var(--fs-sm)",
           background: "transparent", cursor: "pointer", width: "100%",
@@ -370,7 +427,7 @@ function NovaMeta({ onCriada }: { onCriada: () => void }) {
   }
 
   return (
-    <form onSubmit={criar} className="q-surface" style={{ ...styles.panel, padding: 14 }}>
+    <form onSubmit={criar} className="q-surface" style={{ ...styles.panel, padding: 14, borderRadius: 16 }}>
       <div style={styles.formRow}>
         <Field label="Nome">
           <input placeholder="ex: Viagem pra Europa" value={nome} onChange={(e) => setNome(e.target.value)} style={styles.input} autoFocus />
@@ -408,6 +465,7 @@ export function Metas() {
   const [mesAtual, setMesAtual] = useState<string | null>(null);
   const [saldoLivreCents, setSaldoLivreCents] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [metaAbertaId, setMetaAbertaId] = useState<string | null>(null);
 
   function carregarMetas() {
     metasApi.listar().then(setMetas);
@@ -426,6 +484,7 @@ export function Metas() {
   if (carregando || !mesAtual) return <div style={styles.panelHint}>Carregando...</div>;
 
   const guardadoTotalCents = metas.reduce((s, m) => s + m.acumuladoCents, 0);
+  const metaAberta = metas.find((m) => m.id === metaAbertaId) ?? null;
 
   return (
     <>
@@ -444,10 +503,25 @@ export function Metas() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {metas.map((m) => (
-          <MetaCard key={m.id} meta={m} mesAtual={mesAtual} saldoLivreCents={saldoLivreCents} onMudou={carregarMetas} onRemovida={carregarMetas} />
+          <MetaCardResumo key={m.id} meta={m} onAbrir={() => setMetaAbertaId(m.id)} />
         ))}
         <NovaMeta onCriada={carregarMetas} />
       </div>
+
+      {metaAberta && (
+        <MetaSheet
+          key={metaAberta.id}
+          meta={metaAberta}
+          mesAtual={mesAtual}
+          saldoLivreCents={saldoLivreCents}
+          onFechar={() => setMetaAbertaId(null)}
+          onMudou={carregarMetas}
+          onRemovida={() => {
+            setMetaAbertaId(null);
+            carregarMetas();
+          }}
+        />
+      )}
     </>
   );
 }
