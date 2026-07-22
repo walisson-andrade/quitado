@@ -242,8 +242,8 @@ function SecaoFamilia() {
   async function salvarNome(e: React.FormEvent) {
     e.preventDefault();
     if (!nome.trim()) return;
-    const atualizado = await householdApi.atualizar(nome.trim());
-    setHousehold(atualizado);
+    await householdApi.atualizar(nome.trim());
+    carregar();
   }
 
   async function gerarConvite() {

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { MesReferenciaSchema } from "@quitado/shared-types";
 import { resolverMesAtual } from "@quitado/calc";
 import { householdConfig } from "../db/schema.js";
-import type { Handler } from "./types.js";
+import { HttpError, type Handler } from "./types.js";
 
 const MoedaSchema = z.enum(["BRL", "EUR", "USD"]);
 
@@ -53,9 +53,13 @@ const CotacaoQuerySchema = z.object({ moeda: z.enum(["EUR", "USD"]) });
 export const obterCotacaoAtual: Handler = async ({ query }) => {
   const { moeda } = CotacaoQuerySchema.parse(query);
   const resposta = await fetch(`https://economia.awesomeapi.com.br/last/${moeda}-BRL`);
-  if (!resposta.ok) throw new Error(`Falha ao buscar cotação: ${resposta.status}`);
+  if (!resposta.ok) {
+    // 429 (rate limit do plano gratuito) é o caso mais comum aqui — sem
+    // chave de API, ela aceita um número limitado de chamadas por período.
+    throw new HttpError(502, "Não consegui buscar a cotação agora (serviço externo indisponível) — tenta de novo em instantes.");
+  }
   const data = (await resposta.json()) as Record<string, { bid: string }>;
   const par = data[`${moeda}BRL`];
-  if (!par) throw new Error("Cotação não encontrada na resposta da API");
+  if (!par) throw new HttpError(502, "Cotação não encontrada na resposta da API.");
   return { status: 200, body: { cotacao: Number(par.bid) } };
 };
