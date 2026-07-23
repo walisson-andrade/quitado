@@ -75,52 +75,47 @@ export function BarBreakdownList({
                 <ChevronRight className={`q-chevron${estaAberto ? " aberto" : ""}`} size={13} style={{ flexShrink: 0, color: "var(--q-text-faint)" }} />
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.label}
-                  </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <span style={styles.parcelaValor}>{fmt(item.totalCents)}</span>
-                    {mostrarPercentual && (
-                      <span
-                        style={{
-                          fontFamily: "'JetBrains Mono', monospace",
-                          fontSize: "var(--fs-xs)",
-                          color: "var(--q-text-muted)",
-                          width: 34,
-                          textAlign: "right",
-                        }}
-                      >
-                        {somaTotal > 0 ? Math.round((item.totalCents / somaTotal) * 100) : 0}%
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <div style={{ position: "relative", height: 6, background: "var(--q-track-bg)", borderRadius: 3, marginTop: 6 }}>
-                  <div
-                    className="q-bar-fill"
-                    style={{
-                      height: "100%",
-                      width: `${pct}%`,
-                      background: item.cor,
-                      borderRadius: 3,
-                      animationDelay: `${i * 60}ms`,
-                    }}
-                  />
-                  {mostrarMarcadorFim && (
+                <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600, lineHeight: 1.3 }}>{item.label}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                  <div style={{ position: "relative", height: 6, background: "var(--q-track-bg)", borderRadius: 3, flex: 1, minWidth: 0 }}>
                     <div
+                      className="q-bar-fill"
                       style={{
-                        position: "absolute",
-                        left: `${pct}%`,
-                        top: "50%",
-                        transform: "translate(-50%, -50%)",
-                        width: 11,
-                        height: 11,
-                        borderRadius: "50%",
+                        height: "100%",
+                        width: `${pct}%`,
                         background: item.cor,
-                        border: "2.5px solid var(--q-card-bg)",
+                        borderRadius: 3,
+                        animationDelay: `${i * 60}ms`,
                       }}
                     />
+                    {mostrarMarcadorFim && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: `${pct}%`,
+                          top: "50%",
+                          transform: "translate(-50%, -50%)",
+                          width: 11,
+                          height: 11,
+                          borderRadius: "50%",
+                          background: item.cor,
+                          border: "2.5px solid var(--q-card-bg)",
+                        }}
+                      />
+                    )}
+                  </div>
+                  <span style={{ ...styles.parcelaValor, flexShrink: 0 }}>{fmt(item.totalCents)}</span>
+                  {mostrarPercentual && (
+                    <span
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: "var(--fs-xs)",
+                        color: "var(--q-text-muted)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {somaTotal > 0 ? Math.round((item.totalCents / somaTotal) * 100) : 0}%
+                    </span>
                   )}
                 </div>
               </div>

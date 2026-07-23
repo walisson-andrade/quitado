@@ -87,10 +87,14 @@ export function Dashboard({ onAbrirMetas }: { onAbrirMetas?: () => void }) {
         <SummaryCard
           delayMs={0}
           label="Renda do mês"
-          value={fmt(saldo?.rendaCents ?? 0)}
+          value={fmt(saldo?.rendaTotalCents ?? 0)}
           icon={<TrendingUp size={18} color="var(--q-teal)" />}
           accent="var(--q-teal)"
-          foot="salário em € à cotação do dia"
+          foot={
+            saldo?.recebidoDevedoresCents
+              ? `salário à cotação do dia + ${fmt(saldo.recebidoDevedoresCents)} recebido de quem te deve`
+              : "salário em € à cotação do dia"
+          }
         />
         <SummaryCard
           delayMs={60}
@@ -106,11 +110,7 @@ export function Dashboard({ onAbrirMetas }: { onAbrirMetas?: () => void }) {
           value={fmt(saldo?.saldoCents ?? 0)}
           icon={<Wallet size={18} color="var(--q-gold)" />}
           accent="var(--q-gold)"
-          foot={
-            saldo?.recebidoDevedoresCents
-              ? `depois de tudo pago · já inclui ${fmt(saldo.recebidoDevedoresCents)} recebido de quem te deve`
-              : "depois de tudo pago"
-          }
+          foot="depois de tudo pago"
         />
         {metas.length > 0 ? (
           <SummaryCard
@@ -163,15 +163,15 @@ export function Dashboard({ onAbrirMetas }: { onAbrirMetas?: () => void }) {
                 >
                   <IconBadge icon={Icon} cor={cor} tamanho="sm" />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontWeight: 600, fontSize: "var(--fs-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {m.nome}
-                      </span>
+                    <div style={{ fontWeight: 600, fontSize: "var(--fs-sm)", lineHeight: 1.3, marginBottom: 6 }}>{m.nome}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <BarraProgresso progresso={Math.min(progresso.percentual, 1) * 100} cor={cor} />
+                      </div>
                       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", flexShrink: 0 }}>
                         <span style={{ color: "var(--q-text-secondary)", fontWeight: 600 }}>{fmt(m.acumuladoCents)}</span> / {fmt(m.valorAlvoCents)}
                       </span>
                     </div>
-                    <BarraProgresso progresso={Math.min(progresso.percentual, 1) * 100} cor={cor} />
                   </div>
                   {concluida ? (
                     <span

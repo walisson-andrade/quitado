@@ -48,13 +48,17 @@ export function GrupoExpansivel({
           renderHeader(aberto)
         ) : (
           <>
-            <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1 }}>
               {icon && <IconBadge icon={icon} cor={corAccent} tamanho="sm" />}
               <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={16} color={corAccent} style={{ flexShrink: 0 }} />
-              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {titulo}
+              <span style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 1 }}>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-body)", lineHeight: 1.3 }}>
+                  {titulo}
+                </span>
+                <span style={styles.panelHint}>
+                  {quantidadeItens} {quantidadeItens === 1 ? "item" : "itens"}
+                </span>
               </span>
-              <span style={{ ...styles.panelHint, flexShrink: 0 }}>({quantidadeItens} {quantidadeItens === 1 ? "item" : "itens"})</span>
             </span>
             <span style={{ ...styles.parcelaValor, color: corAccent, fontSize: "var(--fs-body)", flexShrink: 0 }}>{fmt(totalCents ?? 0)}</span>
           </>

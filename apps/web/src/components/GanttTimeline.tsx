@@ -54,25 +54,11 @@ function ordenarPorFim<T extends { mesFim: MesReferencia | null }>(itens: T[]): 
 
 function LinhaDivida({ nome, cor, progresso, faltaCents, mesFim, indefinido }: { nome: string; cor: string; progresso: number; faltaCents: number | null; mesFim: MesReferencia | null; indefinido: boolean }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <span
-          style={{
-            fontSize: "var(--fs-sm)",
-            color: "var(--q-text-secondary)",
-            fontWeight: 500,
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {nome}
-        </span>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", flexShrink: 0 }}>
-          {mesFim && faltaCents !== null ? `falta ${fmt(faltaCents)} · até ${mesLabel(mesFim)}` : "sem prazo definido"}
-        </span>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={{ fontSize: "var(--fs-sm)", color: "var(--q-text-secondary)", fontWeight: 500, lineHeight: 1.3 }}>{nome}</span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-xs)", color: "var(--q-text-muted)" }}>
+        {mesFim && faltaCents !== null ? `falta ${fmt(faltaCents)} · até ${mesLabel(mesFim)}` : "sem prazo definido"}
+      </span>
       <BarraProgresso progresso={progresso} cor={cor} indefinido={indefinido} />
     </div>
   );
@@ -221,30 +207,21 @@ export function GanttTimeline({ meses, parcelamentos }: { meses: MesReferencia[]
                   textAlign: "left",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                     <IconBadge icon={g.origem === "fixo" ? Home : CreditCard} cor={g.cor} tamanho="sm" />
                     <ChevronRight className={`q-chevron${aberto ? " aberto" : ""}`} size={15} color={g.cor} style={{ flexShrink: 0 }} />
-                    <span
-                      style={{
-                        fontFamily: "'Space Grotesk', sans-serif",
-                        fontWeight: 600,
-                        fontSize: "var(--fs-sm)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        minWidth: 0,
-                        flex: "1 1 auto",
-                      }}
-                    >
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: "var(--fs-sm)", lineHeight: 1.3, minWidth: 0 }}>
                       {g.label}
                     </span>
-                    <span style={{ fontSize: "var(--fs-xs)", color: "var(--q-text-faint)", flexShrink: 0 }}>
-                      ({g.itens.length} {g.itens.length === 1 ? "dívida" : "dívidas"})
-                    </span>
                   </span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", flexShrink: 0 }}>
-                    {g.mesFim && g.faltaCents !== null ? `falta ${fmt(g.faltaCents)} · até ${mesLabel(g.mesFim)}` : "sem prazo definido"}
+                  <span style={{ display: "flex", justifyContent: "space-between", gap: 8, paddingLeft: 59 }}>
+                    <span style={{ fontSize: "var(--fs-xs)", color: "var(--q-text-faint)", flexShrink: 0 }}>
+                      {g.itens.length} {g.itens.length === 1 ? "dívida" : "dívidas"}
+                    </span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", flexShrink: 0, textAlign: "right" }}>
+                      {g.mesFim && g.faltaCents !== null ? `falta ${fmt(g.faltaCents)} · até ${mesLabel(g.mesFim)}` : "sem prazo definido"}
+                    </span>
                   </span>
                 </div>
                 <BarraProgresso progresso={g.progresso} cor={g.cor} indefinido={g.indefinido} />

@@ -158,6 +158,7 @@ export interface ConfigRow {
 
 export interface SaldoMensalResultado {
   rendaCents: number;
+  rendaTotalCents: number;
   despesasFixasCents: number;
   parcelamentosCents: number;
   itensVariaveisCents: number;

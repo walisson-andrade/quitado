@@ -586,15 +586,19 @@ export function Fatura() {
                     <span style={styles.panelHint}>{f.origem ?? "sem origem"}</span>
                   </div>
                 </div>
-                <span
-                  style={{
-                    fontSize: "var(--fs-tiny)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em",
-                    color: STATUS_COR[f.status], border: `1px solid ${STATUS_COR[f.status]}`, borderRadius: 6,
-                    padding: "2px 6px", flexShrink: 0,
-                  }}
-                >
-                  {STATUS_LABEL[f.status]}
-                </span>
+                {f.status === "confirmado" ? (
+                  <Check size={16} color="var(--q-teal)" strokeWidth={3} style={{ flexShrink: 0 }} />
+                ) : (
+                  <span
+                    style={{
+                      fontSize: "var(--fs-tiny)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em",
+                      color: STATUS_COR[f.status], border: `1px solid ${STATUS_COR[f.status]}`, borderRadius: 6,
+                      padding: "2px 6px", flexShrink: 0,
+                    }}
+                  >
+                    {STATUS_LABEL[f.status]}
+                  </span>
+                )}
                 {confirmarRemocaoId !== f.id && (
                   <button
                     className="q-btn"

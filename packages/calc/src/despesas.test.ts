@@ -37,6 +37,7 @@ describe("calcularSaldoMensal", () => {
 
     const totalEsperado = 150_000 + 64_000 + 12_008 - 27_800;
     expect(resultado.totalDespesasCents).toBe(totalEsperado);
+    expect(resultado.rendaTotalCents).toBe(1_767_090);
     expect(resultado.saldoCents).toBe(1_767_090 - totalEsperado);
   });
 
@@ -56,7 +57,7 @@ describe("calcularSaldoMensal", () => {
     expect(resultado.saldoCents).toBe(100_000);
   });
 
-  it("só parcelas de devedor marcadas 'pago' entram no saldo — pendentes não contam ainda", () => {
+  it("recebido de devedor pago entra como renda, não como desconto de despesa — só pendentes não contam ainda", () => {
     const resultado = calcularSaldoMensal({
       rendaCents: 100_000,
       despesasFixas: [],
@@ -72,7 +73,8 @@ describe("calcularSaldoMensal", () => {
     });
 
     expect(resultado.recebidoDevedoresCents).toBe(30_000);
-    expect(resultado.totalDespesasCents).toBe(-30_000);
+    expect(resultado.totalDespesasCents).toBe(0);
+    expect(resultado.rendaTotalCents).toBe(130_000);
     expect(resultado.saldoCents).toBe(130_000);
   });
 

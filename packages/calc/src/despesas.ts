@@ -101,13 +101,21 @@ export interface SaldoMensalInput {
 
 export interface SaldoMensalResultado {
   rendaCents: number;
+  /** rendaCents (salário) + recebidoDevedoresCents — dinheiro que entrou pelas duas fontes no mês. */
+  rendaTotalCents: number;
   despesasFixasCents: number;
   parcelamentosCents: number;
   itensVariaveisCents: number;
   reembolsosCents: number;
   recebidoDevedoresCents: number;
   aportesMetaCents: number;
-  /** despesas brutas + aportes de meta - reembolsos - parcelas de devedor já pagas no mês */
+  /**
+   * Despesas brutas + aportes de meta - reembolsos. Parcelas de devedor já
+   * pagas NÃO abatem aqui — é dinheiro recebido de outra pessoa, não uma
+   * despesa menor, então entra em `rendaTotalCents` em vez de descontar
+   * daqui (senão "despesas do mês" fica artificialmente baixo, podendo até
+   * ficar negativo num mês com poucas despesas e muito recebido).
+   */
   totalDespesasCents: number;
   saldoCents: number;
 }
@@ -136,15 +144,12 @@ export function calcularSaldoMensal(input: SaldoMensalInput): SaldoMensalResulta
   const aportesMetaCents = calcularTotalAportesMetaNoMes(input.aportesMeta ?? [], input.mesReferencia);
 
   const totalDespesasCents =
-    despesasFixasCents +
-    parcelamentosCents +
-    itensVariaveisCents +
-    aportesMetaCents -
-    reembolsosCents -
-    recebidoDevedoresCents;
+    despesasFixasCents + parcelamentosCents + itensVariaveisCents + aportesMetaCents - reembolsosCents;
+  const rendaTotalCents = input.rendaCents + recebidoDevedoresCents;
 
   return {
     rendaCents: input.rendaCents,
+    rendaTotalCents,
     despesasFixasCents,
     parcelamentosCents,
     itensVariaveisCents,
@@ -152,6 +157,6 @@ export function calcularSaldoMensal(input: SaldoMensalInput): SaldoMensalResulta
     recebidoDevedoresCents,
     aportesMetaCents,
     totalDespesasCents,
-    saldoCents: input.rendaCents - totalDespesasCents,
+    saldoCents: rendaTotalCents - totalDespesasCents,
   };
 }
