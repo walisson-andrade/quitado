@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
-import { ArrowDownRight, Check, Target, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDownRight, Check, ChevronRight, Target, TrendingUp, Wallet } from "lucide-react";
+import { calcularProgressoMeta } from "@quitado/calc";
 import { dashboardApi, devedoresApi, metasApi, parcelamentosApi } from "../api/resources.js";
 import type { DashboardResponse, DevedorRow, MetaRow, ParcelaDevedorRow, ParcelamentoRow } from "../api/types.js";
+import { BarraProgresso } from "../components/BarraProgresso.js";
 import { CategoriaChart } from "../components/CategoriaChart.js";
 import { DespesaChart } from "../components/DespesaChart.js";
 import { GanttTimeline } from "../components/GanttTimeline.js";
+import { IconBadge } from "../components/IconBadge.js";
 import { OrigemChart } from "../components/OrigemChart.js";
 import { SaldoChart } from "../components/SaldoChart.js";
 import { SummaryCard } from "../components/SummaryCard.js";
 import { fmt, mesLabel } from "../format.js";
+import { META_CATEGORIA_INFO } from "../metaVisual.js";
 import { styles } from "../styles.js";
 
-export function Dashboard() {
+export function Dashboard({ onAbrirMetas }: { onAbrirMetas?: () => void }) {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [parcelamentos, setParcelamentos] = useState<ParcelamentoRow[]>([]);
   const [metas, setMetas] = useState<MetaRow[]>([]);
@@ -129,6 +133,64 @@ export function Dashboard() {
           />
         )}
       </section>
+
+      {metas.length > 0 && (
+        <section className="q-surface" style={styles.panel}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 12 }}>
+            <div style={{ ...styles.panelHeadRow, marginBottom: 0 }}>
+              <h3 style={styles.panelTitle}>Metas</h3>
+              <span style={styles.panelHint}>{metas.length} {metas.length === 1 ? "ativa" : "ativas"} · toque pra abrir</span>
+            </div>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-title)", fontWeight: 600, color: "var(--q-purple)", whiteSpace: "nowrap" }}>
+              {fmt(guardadoTotalCents)}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {metas.map((m) => {
+              const { cor, Icon } = META_CATEGORIA_INFO[m.categoria];
+              const progresso = calcularProgressoMeta(m);
+              const concluida = progresso.percentual >= 1;
+              return (
+                <button
+                  key={m.id}
+                  className="q-btn"
+                  onClick={onAbrirMetas}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    background: "var(--q-card-bg)", border: "1px solid var(--q-border)", borderRadius: 14,
+                    padding: "11px 12px", cursor: onAbrirMetas ? "pointer" : "default", color: "var(--q-text)", textAlign: "left",
+                  }}
+                >
+                  <IconBadge icon={Icon} cor={cor} tamanho="sm" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600, fontSize: "var(--fs-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {m.nome}
+                      </span>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "var(--fs-xs)", color: "var(--q-text-muted)", flexShrink: 0 }}>
+                        <span style={{ color: "var(--q-text-secondary)", fontWeight: 600 }}>{fmt(m.acumuladoCents)}</span> / {fmt(m.valorAlvoCents)}
+                      </span>
+                    </div>
+                    <BarraProgresso progresso={Math.min(progresso.percentual, 1) * 100} cor={cor} />
+                  </div>
+                  {concluida ? (
+                    <span
+                      style={{
+                        fontSize: 9, fontWeight: 700, color: "var(--q-teal)", background: "var(--q-success-tint)",
+                        border: "1px solid var(--q-teal)", padding: "1px 6px", borderRadius: 999, flexShrink: 0,
+                      }}
+                    >
+                      ✓
+                    </span>
+                  ) : (
+                    <ChevronRight size={14} color="var(--q-text-faint)" style={{ flexShrink: 0 }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="q-surface" style={styles.panel}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 12 }}>

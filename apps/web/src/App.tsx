@@ -118,7 +118,7 @@ export default function App() {
 
       <main style={styles.main}>
         <div key={tab} className="q-tab-fade">
-          {tab === "dashboard" && <Dashboard />}
+          {tab === "dashboard" && <Dashboard onAbrirMetas={() => setTab("meta")} />}
           {tab === "despesas" && <Despesas />}
           {tab === "devem" && <QuemMeDeve />}
           {tab === "fatura" && <Fatura />}

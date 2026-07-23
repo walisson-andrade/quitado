@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  Car, GraduationCap, Home, Pencil, Plane, Plus, ShieldAlert, ShoppingBag, Target, Trash2, X,
-} from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { calcularAporteNecessario, calcularProgressoMeta, mesesRestantesMeta } from "@quitado/calc";
 import { configApi, dashboardApi, metasApi } from "../api/resources.js";
 import type { MetaAporteRow, MetaCategoria, MetaRow } from "../api/types.js";
@@ -10,17 +8,8 @@ import { BarraProgresso } from "../components/BarraProgresso.js";
 import { Field } from "../components/Field.js";
 import { MesInput } from "../components/MesInput.js";
 import { fmt, mesLabel } from "../format.js";
+import { META_CATEGORIA_INFO as CATEGORIA_INFO } from "../metaVisual.js";
 import { styles } from "../styles.js";
-
-const CATEGORIA_INFO: Record<MetaCategoria, { label: string; cor: string; Icon: typeof Target }> = {
-  viagem: { label: "Viagem", cor: "var(--q-teal)", Icon: Plane },
-  carro: { label: "Carro", cor: "var(--q-blue)", Icon: Car },
-  casa: { label: "Casa", cor: "var(--q-gold)", Icon: Home },
-  educacao: { label: "Educação", cor: "var(--q-purple)", Icon: GraduationCap },
-  compra: { label: "Compra", cor: "var(--q-rose)", Icon: ShoppingBag },
-  emergencia: { label: "Emergência", cor: "var(--q-orange)", Icon: ShieldAlert },
-  outro: { label: "Outro", cor: "var(--q-text-muted)", Icon: Target },
-};
 
 function IconeMeta({ categoria, tamanho = 34 }: { categoria: MetaCategoria; tamanho?: number }) {
   const { cor, Icon } = CATEGORIA_INFO[categoria];
